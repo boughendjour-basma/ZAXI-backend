@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
-import { registerSchema, loginSchema, resetPasswordSchema } from '../validators/auth.validator';
+import { registerSchema, loginSchema, resetPasswordSchema, changePasswordSchema } from '../validators/auth.validator';
 import { requestCodeSchema, verifyCodeSchema } from '../validators/phone.validator';
 
 export class AuthController {
@@ -114,6 +114,23 @@ export class AuthController {
     try {
       const validatedData = resetPasswordSchema.parse(req.body);
       const result = await AuthService.resetPassword(validatedData);
+      res.status(200).json({ status: 'success', message: result.message });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/auth/change-password
+   * Authenticated password change for any user (such as the DRIVER).
+   */
+  static async changePassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user || !req.user.userId) {
+        return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      }
+      const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+      const result = await AuthService.changePassword(req.user.userId, currentPassword, newPassword);
       res.status(200).json({ status: 'success', message: result.message });
     } catch (error) {
       next(error);

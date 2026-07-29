@@ -31,6 +31,7 @@ router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);
 router.get('/me', authenticate, AuthController.getCurrentUser);
 router.post('/logout', authenticate, AuthController.logout);
+router.patch('/change-password', authenticate, AuthController.changePassword);
 
 // ─── Password Recovery ────────────────────────────────────────────────────────
 router.post('/forgot-password/request-code', otpLimiter, AuthController.forgotPasswordRequestCode);

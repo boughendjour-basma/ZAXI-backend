@@ -42,6 +42,27 @@ export const resetPasswordSchema = z.object({
     .max(100, 'Password is too long'),
 });
 
+// ─── Authenticated Password Change ────────────────────────────────────────────
+
+/**
+ * PATCH /api/auth/change-password
+ * Allows an authenticated user (such as the DRIVER) to change their password.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z
+      .string()
+      .trim()
+      .min(8, 'New password must be at least 8 characters long')
+      .max(100, 'New password is too long'),
+  })
+  .refine((data) => data.currentPassword.trim() !== data.newPassword.trim(), {
+    message: 'New password cannot be the same as the current password',
+    path: ['newPassword'],
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

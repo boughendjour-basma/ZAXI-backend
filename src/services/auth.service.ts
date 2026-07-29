@@ -6,6 +6,7 @@ import { normalizePhoneNumber } from '../validators/phone.validator';
 import { generateToken, generateVerificationToken, verifyVerificationToken } from '../utils/jwt';
 import { SMSService } from './sms/sms.service';
 import { SocketService } from '../sockets/socket.service';
+import { AuditLogService } from './audit-log.service';
 
 /** Fields safely returned to the client — never includes passwordHash. */
 export const safeUserSelect = {
@@ -347,5 +348,59 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  /**
+   * PATCH /api/auth/change-password
+   * Authenticated password change for any user (such as DRIVER or CUSTOMER).
+   */
+  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      const error: any = new Error('User not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!user.passwordHash) {
+      const error: any = new Error('Current password is incorrect');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const isCurrentValid = await argon2.verify(user.passwordHash, currentPassword);
+    if (!isCurrentValid) {
+      const error: any = new Error('Current password is incorrect');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const isSamePassword = await argon2.verify(user.passwordHash, newPassword);
+    if (isSamePassword) {
+      const error: any = new Error('New password cannot be the same as the current password');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const now = new Date();
+    const newPasswordHash = await argon2.hash(newPassword);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash,
+        lastLoginAt: now,
+      },
+    });
+
+    await AuditLogService.logAction({
+      userId,
+      action: 'PASSWORD_CHANGED',
+      entity: 'User',
+      entityId: userId,
+    });
+
+    return { message: 'Password updated successfully' };
   }
 }
