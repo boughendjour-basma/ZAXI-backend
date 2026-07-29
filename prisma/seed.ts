@@ -18,15 +18,14 @@ async function main() {
   console.log('🌱 Starting database seed...');
 
   // ─── Read driver credentials from environment variables ────────────
-  const driverEmail = process.env.DRIVER_EMAIL;
   const driverPassword = process.env.DRIVER_PASSWORD;
   const driverName = process.env.DRIVER_NAME;
   const driverPhone = process.env.DRIVER_PHONE;
 
-  if (!driverEmail || !driverPassword || !driverName || !driverPhone) {
+  if (!driverPassword || !driverName || !driverPhone) {
     throw new Error(
       'Missing required environment variables for driver seed.\n' +
-        'Please set DRIVER_EMAIL, DRIVER_PASSWORD, DRIVER_NAME, and DRIVER_PHONE in your .env file.'
+        'Please set DRIVER_PASSWORD, DRIVER_NAME, and DRIVER_PHONE in your .env file.'
     );
   }
 
@@ -36,18 +35,16 @@ async function main() {
   // ─── Upsert the driver account (idempotent) ────────────────────────
   // Using upsert ensures that:
   // - If the driver account doesn't exist, it gets created.
-  // - If the driver account already exists (matched by email), it gets updated.
+  // - If the driver account already exists (matched by phone), it gets updated.
   // - Running this seed multiple times will never create duplicate accounts.
   const driver = await prisma.user.upsert({
-    where: { email: driverEmail },
+    where: { phone: driverPhone },
     update: {
       name: driverName,
-      phone: driverPhone,
       passwordHash: hashedPassword,
       role: Role.DRIVER,
     },
     create: {
-      email: driverEmail,
       passwordHash: hashedPassword,
       name: driverName,
       phone: driverPhone,
@@ -57,7 +54,6 @@ async function main() {
 
   console.log(`✅ Driver account seeded successfully:`);
   console.log(`   ID:    ${driver.id}`);
-  console.log(`   Email: ${driver.email}`);
   console.log(`   Name:  ${driver.name}`);
   console.log(`   Phone: ${driver.phone}`);
   console.log(`   Role:  ${driver.role}`);
