@@ -1,0 +1,55 @@
+name: ZAXI Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: zaxi_test
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: zaxi_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/node-setup@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Check TypeScript Compilation
+        run: npx tsc --noEmit
+
+      - name: Run Test Suite
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://zaxi_test:test_password@localhost:5432/zaxi_test_db?schema=public
+          JWT_SECRET: super_secret_test_jwt_key_32_bytes_long
+        run: npm test
+
+      - name: Verify Production Build
+        run: npm run build

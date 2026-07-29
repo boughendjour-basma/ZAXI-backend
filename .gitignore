@@ -1,0 +1,33 @@
+# ─── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+
+# ─── Environment Variables (NEVER commit secrets) ────────────────────────────
+.env
+.env.development
+.env.production
+.env.test
+
+# ─── Build Output ────────────────────────────────────────────────────────────
+dist/
+
+# ─── Prisma Generated Client ─────────────────────────────────────────────────
+# The client is generated at deploy time via `prisma generate`
+# node_modules/@prisma/client is already excluded above
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ─── OS / Editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ─── Test Artefacts ──────────────────────────────────────────────────────────
+test-backups/
+coverage/
+
+# ─── Misc ────────────────────────────────────────────────────────────────────
+*.tsbuildinfo
