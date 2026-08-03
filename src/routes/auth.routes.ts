@@ -27,14 +27,13 @@ router.post('/request-code', otpLimiter, AuthController.requestCode);
 router.post('/verify-code', AuthController.verifyCode);
 router.post('/register', AuthController.register);
 
-// ─── Normal Login / Session ───────────────────────────────────────────────────
-router.post('/login', AuthController.login);
+// ─── Login Flow (Two-Step OTP for All Users) ──────────────────────────────────
+// Step 1: request login OTP → Step 2: verify OTP → receive JWT
+router.post('/login/request-code', otpLimiter, AuthController.loginRequestCode);
+router.post('/login/verify', AuthController.loginVerify);
+
+// ─── Session ──────────────────────────────────────────────────────────────────
 router.get('/me', authenticate, AuthController.getCurrentUser);
 router.post('/logout', authenticate, AuthController.logout);
-router.patch('/change-password', authenticate, AuthController.changePassword);
-
-// ─── Password Recovery ────────────────────────────────────────────────────────
-router.post('/forgot-password/request-code', otpLimiter, AuthController.forgotPasswordRequestCode);
-router.post('/forgot-password/reset', AuthController.resetPassword);
 
 export default router;

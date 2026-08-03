@@ -5,64 +5,32 @@ import { z } from 'zod';
 /**
  * POST /api/auth/register
  * Requires the short-lived verificationToken issued by /api/auth/verify-code.
- * Creates the CUSTOMER account and immediately returns an auth JWT.
+ * Creates the CUSTOMER account (passwordless) and immediately returns an auth JWT.
  */
 export const registerSchema = z.object({
   verificationToken: z.string().min(1, 'Verification token is required'),
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters long')
-    .max(100, 'Password is too long'),
 });
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+// ─── Login Flow (Two-Step OTP) ────────────────────────────────────────────────
 
 /**
- * POST /api/auth/login
- * Authenticates using phone + password. Never sends OTP.
+ * POST /api/auth/login/request-code
+ * Request a 6-digit login OTP for an existing phone number.
  */
-export const loginSchema = z.object({
+export const loginRequestCodeSchema = z.object({
   phone: z.string().min(8, 'Phone number must be valid').max(20),
-  password: z.string().min(1, 'Password is required'),
 });
 
-// ─── Password Recovery ────────────────────────────────────────────────────────
-
 /**
- * POST /api/auth/forgot-password/reset
- * Verifies a reset OTP and replaces the password hash.
+ * POST /api/auth/login/verify
+ * Verify a 6-digit login OTP and return auth JWT + user profile.
  */
-export const resetPasswordSchema = z.object({
+export const loginVerifySchema = z.object({
   phone: z.string().min(8, 'Phone number must be valid').max(20),
   code: z.string().trim().regex(/^\d{6}$/, 'Verification code must be exactly 6 digits'),
-  newPassword: z
-    .string()
-    .min(8, 'Password must be at least 8 characters long')
-    .max(100, 'Password is too long'),
 });
 
-// ─── Authenticated Password Change ────────────────────────────────────────────
-
-/**
- * PATCH /api/auth/change-password
- * Allows an authenticated user (such as the DRIVER) to change their password.
- */
-export const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z
-      .string()
-      .trim()
-      .min(8, 'New password must be at least 8 characters long')
-      .max(100, 'New password is too long'),
-  })
-  .refine((data) => data.currentPassword.trim() !== data.newPassword.trim(), {
-    message: 'New password cannot be the same as the current password',
-    path: ['newPassword'],
-  });
-
 export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type LoginRequestCodeInput = z.infer<typeof loginRequestCodeSchema>;
+export type LoginVerifyInput = z.infer<typeof loginVerifySchema>;

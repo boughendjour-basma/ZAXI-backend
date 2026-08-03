@@ -1,7 +1,6 @@
 import { PrismaClient, Role } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import argon2 from 'argon2';
 import dotenv from 'dotenv';
 
 // Load environment variables for the Prisma seed script
@@ -17,38 +16,31 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // ─── Read driver credentials from environment variables ────────────
-  const driverPassword = process.env.DRIVER_PASSWORD;
+  // ─── Read driver info from environment variables ────────────────────
   const driverName = process.env.DRIVER_NAME;
   const driverPhone = process.env.DRIVER_PHONE;
 
-  if (!driverPassword || !driverName || !driverPhone) {
+  if (!driverName || !driverPhone) {
     throw new Error(
       'Missing required environment variables for driver seed.\n' +
-        'Please set DRIVER_PASSWORD, DRIVER_NAME, and DRIVER_PHONE in your .env file.'
+        'Please set DRIVER_NAME and DRIVER_PHONE in your .env file.'
     );
   }
 
-  // ─── Hash the driver password with Argon2 ──────────────────────────
-  const hashedPassword = await argon2.hash(driverPassword);
-
   // ─── Upsert the driver account (idempotent) ────────────────────────
-  // Using upsert ensures that:
-  // - If the driver account doesn't exist, it gets created.
-  // - If the driver account already exists (matched by phone), it gets updated.
-  // - Running this seed multiple times will never create duplicate accounts.
+  // The driver authenticates via SMS OTP — no password is stored.
   const driver = await prisma.user.upsert({
     where: { phone: driverPhone },
     update: {
       name: driverName,
-      passwordHash: hashedPassword,
       role: Role.DRIVER,
+      phoneVerified: true,
     },
     create: {
-      passwordHash: hashedPassword,
       name: driverName,
       phone: driverPhone,
       role: Role.DRIVER,
+      phoneVerified: true,
     },
   });
 

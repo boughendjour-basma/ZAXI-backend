@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
-import { registerSchema, loginSchema, resetPasswordSchema, changePasswordSchema } from '../validators/auth.validator';
+import { registerSchema, loginRequestCodeSchema, loginVerifySchema } from '../validators/auth.validator';
 import { requestCodeSchema, verifyCodeSchema } from '../validators/phone.validator';
 
 export class AuthController {
@@ -36,8 +36,8 @@ export class AuthController {
 
   /**
    * POST /api/auth/register
-   * Step 3 of sign-up: create account using the verificationToken.
-   * Body: { verificationToken, name, password }
+   * Step 3 of sign-up: create CUSTOMER account using the verificationToken.
+   * Body: { verificationToken, name }
    * Returns an auth JWT immediately after account creation.
    */
   static async register(req: Request, res: Response, next: NextFunction) {
@@ -51,14 +51,29 @@ export class AuthController {
   }
 
   /**
-   * POST /api/auth/login
-   * Body: { phone, password }
-   * Normal login for both CUSTOMER and DRIVER. Never sends OTP.
+   * POST /api/auth/login/request-code
+   * Step 1 of login: request a login OTP for any registered phone (customer or driver).
+   * Always returns generic success — never reveals whether the phone is registered.
    */
-  static async login(req: Request, res: Response, next: NextFunction) {
+  static async loginRequestCode(req: Request, res: Response, next: NextFunction) {
     try {
-      const validatedData = loginSchema.parse(req.body);
-      const result = await AuthService.login(validatedData);
+      const { phone } = loginRequestCodeSchema.parse(req.body);
+      const result = await AuthService.loginRequestCode(phone);
+      res.status(200).json({ status: 'success', message: result.message });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/auth/login/verify
+   * Step 2 of login: verify the login OTP and return auth JWT + user profile.
+   * Works identically for CUSTOMER and DRIVER.
+   */
+  static async loginVerify(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { phone, code } = loginVerifySchema.parse(req.body);
+      const result = await AuthService.loginVerify(phone, code);
       res.status(200).json({ status: 'success', data: result });
     } catch (error) {
       next(error);
@@ -89,51 +104,5 @@ export class AuthController {
       status: 'success',
       message: 'Successfully logged out. Please remove the token from your client.',
     });
-  }
-
-  /**
-   * POST /api/auth/forgot-password/request-code
-   * Sends a reset OTP. Returns success regardless of whether the phone is registered.
-   */
-  static async forgotPasswordRequestCode(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { phone } = requestCodeSchema.parse(req.body);
-      const result = await AuthService.forgotPasswordRequestCode(phone);
-      res.status(200).json({ status: 'success', message: result.message });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * POST /api/auth/forgot-password/reset
-   * Body: { phone, code, newPassword }
-   * Verifies OTP and replaces the password hash.
-   */
-  static async resetPassword(req: Request, res: Response, next: NextFunction) {
-    try {
-      const validatedData = resetPasswordSchema.parse(req.body);
-      const result = await AuthService.resetPassword(validatedData);
-      res.status(200).json({ status: 'success', message: result.message });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * PATCH /api/auth/change-password
-   * Authenticated password change for any user (such as the DRIVER).
-   */
-  static async changePassword(req: Request, res: Response, next: NextFunction) {
-    try {
-      if (!req.user || !req.user.userId) {
-        return res.status(401).json({ status: 'error', message: 'Unauthorized' });
-      }
-      const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
-      const result = await AuthService.changePassword(req.user.userId, currentPassword, newPassword);
-      res.status(200).json({ status: 'success', message: result.message });
-    } catch (error) {
-      next(error);
-    }
   }
 }

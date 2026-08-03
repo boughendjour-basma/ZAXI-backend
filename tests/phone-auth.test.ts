@@ -36,7 +36,7 @@ function makeUser(overrides: Record<string, any> = {}) {
 }
 
 function makeDriverUser(overrides: Record<string, any> = {}) {
-  return makeUser({ id: DRIVER_ID, role: Role.DRIVER, phone: '+213666777888', ...overrides });
+  return makeUser({ id: DRIVER_ID, role: Role.DRIVER, phone: '+213666777888', passwordHash: null, ...overrides });
 }
 
 function makeOTP(overrides: Record<string, any> = {}) {
@@ -264,8 +264,6 @@ describe('POST /api/auth/verify-code — OTP Verification', () => {
   });
 
   it('should reject reuse of already-verified OTP', async () => {
-    // verified=true OTPs are excluded by the query (verified: false)
-    // So findFirst returns null when there is no unverified OTP
     prismaMock.oTPVerification.findFirst.mockResolvedValue(null);
 
     const res = await request(app)
@@ -295,20 +293,19 @@ describe('POST /api/auth/verify-code — OTP Verification', () => {
 
 // ─── 4. POST /api/auth/register ───────────────────────────────────────────────
 
-describe('POST /api/auth/register — Create Customer Account', () => {
+describe('POST /api/auth/register — Create Passwordless Customer Account', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should create account and return a valid auth JWT', async () => {
+  it('should create passwordless account and return a valid auth JWT', async () => {
     const verificationToken = generateVerificationToken('+213555123456');
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue(makeUser() as any);
-    vi.spyOn(argon2, 'hash').mockResolvedValue('$argon2id$hashed' as any);
 
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ verificationToken, name: 'Basma Boughendjour', password: 'StrongPassword123!' });
+      .send({ verificationToken, name: 'Basma Boughendjour' });
 
     expect(res.status).toBe(201);
     expect(res.body.data.token).toBeDefined();
@@ -327,32 +324,28 @@ describe('POST /api/auth/register — Create Customer Account', () => {
     const verificationToken = generateVerificationToken('+213555123456');
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue(makeUser() as any);
-    vi.spyOn(argon2, 'hash').mockResolvedValue('$argon2id$hashed' as any);
     const emitSpy = vi.spyOn(SocketService, 'emitAuthVerified');
 
     await request(app)
       .post('/api/auth/register')
-      .send({ verificationToken, name: 'Basma Boughendjour', password: 'StrongPassword123!' });
+      .send({ verificationToken, name: 'Basma Boughendjour' });
 
     expect(emitSpy).toHaveBeenCalledWith(
       expect.objectContaining({ userId: CUSTOMER_ID, phone: '+213555123456', role: 'CUSTOMER' })
     );
   });
 
-  it('should store only the Argon2 password hash — never plaintext', async () => {
+  it('should store passwordHash as null for passwordless customer account', async () => {
     const verificationToken = generateVerificationToken('+213555123456');
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue(makeUser() as any);
-    vi.spyOn(argon2, 'hash').mockResolvedValue('$argon2id$hashed' as any);
 
     await request(app)
       .post('/api/auth/register')
-      .send({ verificationToken, name: 'Basma', password: 'StrongPassword123!' });
+      .send({ verificationToken, name: 'Basma' });
 
     const createCall = prismaMock.user.create.mock.calls[0][0];
-    expect(createCall.data.passwordHash).toMatch(/^\$argon2/);
-    // Plaintext password must never appear in the stored data
-    expect(createCall.data.passwordHash).not.toBe('StrongPassword123!');
+    expect(createCall.data.passwordHash).toBeNull();
   });
 
   it('should reject a duplicate registration with 409', async () => {
@@ -361,7 +354,7 @@ describe('POST /api/auth/register — Create Customer Account', () => {
 
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ verificationToken, name: 'Basma', password: 'StrongPassword123!' });
+      .send({ verificationToken, name: 'Basma' });
 
     expect(res.status).toBe(409);
   });
@@ -369,120 +362,167 @@ describe('POST /api/auth/register — Create Customer Account', () => {
   it('should reject an invalid verificationToken with 401', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ verificationToken: 'bad-token', name: 'Basma', password: 'StrongPassword123!' });
+      .send({ verificationToken: 'bad-token', name: 'Basma' });
 
     expect(res.status).toBe(401);
   });
 });
 
-// ─── 5. POST /api/auth/forgot-password/request-code ──────────────────────────
+// ─── 5. POST /api/auth/login/request-code ────────────────────────────────────
 
-describe('POST /api/auth/forgot-password/request-code', () => {
+describe('POST /api/auth/login/request-code — Login OTP Request', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should send a reset OTP when the phone is registered', async () => {
+  it('should send a login OTP and return generic success for a registered customer', async () => {
     prismaMock.user.findUnique.mockResolvedValue(makeUser() as any);
     prismaMock.oTPVerification.deleteMany.mockResolvedValue({ count: 0 } as any);
     prismaMock.oTPVerification.create.mockResolvedValue(makeOTP() as any);
     const smsSpy = vi.spyOn(SMSService, 'sendSMS').mockResolvedValue(true);
 
     const res = await request(app)
-      .post('/api/auth/forgot-password/request-code')
+      .post('/api/auth/login/request-code')
       .send({ phone: '+213555123456' });
 
     expect(res.status).toBe(200);
-    expect(smsSpy).toHaveBeenCalled();
-    expect(res.body.message).toMatch(/verification code/i);
+    expect(res.body.status).toBe('success');
+    expect(res.body.message).toMatch(/if this phone number is registered/i);
+    expect(smsSpy).toHaveBeenCalledWith('+213555123456', expect.stringContaining('ZAXI login code'));
+    // OTP must never be returned in the response
+    expect(JSON.stringify(res.body)).not.toMatch(/\d{6}/);
   });
 
-  it('should return 200 silently without sending OTP for an unknown phone (no enumeration)', async () => {
+  it('should send a login OTP and return generic success for the driver', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(makeDriverUser() as any);
+    prismaMock.oTPVerification.deleteMany.mockResolvedValue({ count: 0 } as any);
+    prismaMock.oTPVerification.create.mockResolvedValue(makeOTP({ phone: '+213666777888' }) as any);
+    const smsSpy = vi.spyOn(SMSService, 'sendSMS').mockResolvedValue(true);
+
+    const res = await request(app)
+      .post('/api/auth/login/request-code')
+      .send({ phone: '+213666777888' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/if this phone number is registered/i);
+    expect(smsSpy).toHaveBeenCalledWith('+213666777888', expect.any(String));
+  });
+
+  it('should return 200 silently without sending OTP for an unregistered phone (prevents enumeration)', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     const smsSpy = vi.spyOn(SMSService, 'sendSMS').mockResolvedValue(true);
 
     const res = await request(app)
-      .post('/api/auth/forgot-password/request-code')
-      .send({ phone: '+213999999999' });
+      .post('/api/auth/login/request-code')
+      .send({ phone: '+213999000000' });
 
     expect(res.status).toBe(200);
-    // OTP must NOT be sent — prevents user enumeration
+    expect(res.body.message).toMatch(/if this phone number is registered/i);
     expect(smsSpy).not.toHaveBeenCalled();
   });
 });
 
-// ─── 6. POST /api/auth/forgot-password/reset ─────────────────────────────────
+// ─── 6. POST /api/auth/login/verify ──────────────────────────────────────────
 
-describe('POST /api/auth/forgot-password/reset', () => {
+describe('POST /api/auth/login/verify — Login OTP Verification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should reset password with a valid OTP and update the hash', async () => {
+  it('should verify customer login OTP and return a valid auth JWT', async () => {
     const otp = makeOTP();
     prismaMock.oTPVerification.findFirst.mockResolvedValue(otp as any);
     vi.spyOn(argon2, 'verify').mockResolvedValue(true);
     prismaMock.oTPVerification.update.mockResolvedValue({ ...otp, verified: true } as any);
     prismaMock.user.findUnique.mockResolvedValue(makeUser() as any);
-    prismaMock.user.update.mockResolvedValue(makeUser() as any);
-    vi.spyOn(argon2, 'hash').mockResolvedValue('$argon2id$newhash' as any);
+    prismaMock.user.update.mockResolvedValue(makeUser({ lastLoginAt: new Date() }) as any);
 
     const res = await request(app)
-      .post('/api/auth/forgot-password/reset')
-      .send({ phone: '+213555123456', code: '483921', newPassword: 'NewPassword456!' });
+      .post('/api/auth/login/verify')
+      .send({ phone: '+213555123456', code: '483921' });
 
     expect(res.status).toBe(200);
-    expect(res.body.message).toMatch(/password reset successfully/i);
-    expect(prismaMock.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ passwordHash: '$argon2id$newhash' }),
-      })
-    );
+    expect(res.body.data.token).toBeDefined();
+    expect(res.body.data.user.role).toBe('CUSTOMER');
+    expect(res.body.data.user).not.toHaveProperty('passwordHash');
+
+    const decoded: any = jwt.verify(res.body.data.token, process.env.JWT_SECRET || 'fallback_secret');
+    expect(decoded.userId).toBeDefined();
+    expect(decoded.role).toBe('CUSTOMER');
+    expect(decoded.phone).toBe('+213555123456');
   });
 
-  it('should reject an invalid OTP and increment attempts', async () => {
+  it('should verify driver login OTP and return JWT with role=DRIVER', async () => {
+    const otp = makeOTP({ phone: '+213666777888' });
+    prismaMock.oTPVerification.findFirst.mockResolvedValue(otp as any);
+    vi.spyOn(argon2, 'verify').mockResolvedValue(true);
+    prismaMock.oTPVerification.update.mockResolvedValue({ ...otp, verified: true } as any);
+    prismaMock.user.findUnique.mockResolvedValue(makeDriverUser() as any);
+    prismaMock.user.update.mockResolvedValue(makeDriverUser({ lastLoginAt: new Date() }) as any);
+
+    const res = await request(app)
+      .post('/api/auth/login/verify')
+      .send({ phone: '+213666777888', code: '483921' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.role).toBe('DRIVER');
+    expect(res.body.data.token).toBeDefined();
+  });
+
+  it('should reject an invalid OTP code with 400 and increment attempts', async () => {
     const otp = makeOTP({ attempts: 0 });
     prismaMock.oTPVerification.findFirst.mockResolvedValue(otp as any);
     vi.spyOn(argon2, 'verify').mockResolvedValue(false);
     prismaMock.oTPVerification.update.mockResolvedValue({ ...otp, attempts: 1 } as any);
 
     const res = await request(app)
-      .post('/api/auth/forgot-password/reset')
-      .send({ phone: '+213555123456', code: '000000', newPassword: 'NewPassword456!' });
+      .post('/api/auth/login/verify')
+      .send({ phone: '+213555123456', code: '000000' });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/invalid verification code/i);
+    expect(res.body.message).toMatch(/invalid phone or verification code/i);
     expect(prismaMock.oTPVerification.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { attempts: { increment: 1 } } })
     );
   });
 
-  it('should reject an expired reset OTP with 400', async () => {
+  it('should reject an expired login OTP with 400', async () => {
     const expiredOtp = makeOTP({ expiresAt: new Date(Date.now() - 60000) });
     prismaMock.oTPVerification.findFirst.mockResolvedValue(expiredOtp as any);
 
     const res = await request(app)
-      .post('/api/auth/forgot-password/reset')
-      .send({ phone: '+213555123456', code: '483921', newPassword: 'NewPassword456!' });
+      .post('/api/auth/login/verify')
+      .send({ phone: '+213555123456', code: '483921' });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/expired/i);
   });
 
-  it('should reject reset after 5 failed attempts', async () => {
+  it('should reject after 5 failed attempts with 400', async () => {
     const lockedOtp = makeOTP({ attempts: 5 });
     prismaMock.oTPVerification.findFirst.mockResolvedValue(lockedOtp as any);
 
     const res = await request(app)
-      .post('/api/auth/forgot-password/reset')
-      .send({ phone: '+213555123456', code: '483921', newPassword: 'NewPassword456!' });
+      .post('/api/auth/login/verify')
+      .send({ phone: '+213555123456', code: '483921' });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/too many/i);
   });
+
+  it('should reject a reused/non-existent OTP with 400', async () => {
+    prismaMock.oTPVerification.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/auth/login/verify')
+      .send({ phone: '+213555123456', code: '483921' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid phone or verification code/i);
+  });
 });
 
-// ─── 6. Privacy — Phone Number Visibility ────────────────────────────────────
+// ─── 7. Privacy — Phone Number Visibility ────────────────────────────────────
 
 describe('Phone Privacy — Driver/Customer visibility', () => {
   let customerToken: string;
