@@ -42,6 +42,35 @@ async function main() {
   console.log(`   Phone: ${driver.phone}`);
   console.log(`   Role:  ${driver.role}`);
 
+  const customerPhone = process.env.CUSTOMER_PHONE || '+213666000000';
+  const customerPassword = process.env.CUSTOMER_PASSWORD || 'password123';
+  const customerPasswordHash = await argon2.hash(customerPassword);
+
+  const customer = await prisma.user.upsert({
+    where: { phone: customerPhone },
+    update: {
+      name: 'Client Test',
+      passwordHash: customerPasswordHash,
+      dateOfBirth: new Date('1995-05-15'),
+      role: Role.CUSTOMER,
+      phoneVerified: true,
+    },
+    create: {
+      name: 'Client Test',
+      phone: customerPhone,
+      passwordHash: customerPasswordHash,
+      dateOfBirth: new Date('1995-05-15'),
+      role: Role.CUSTOMER,
+      phoneVerified: true,
+    },
+  });
+
+  console.log(`✅ Customer account seeded successfully:`);
+  console.log(`   ID:    ${customer.id}`);
+  console.log(`   Name:  ${customer.name}`);
+  console.log(`   Phone: ${customer.phone}`);
+  console.log(`   Role:  ${customer.role}`);
+
   const pricingSettings = await prisma.pricingSettings.upsert({
     where: { id: 1 },
     update: {},

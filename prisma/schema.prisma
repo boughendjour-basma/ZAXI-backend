@@ -68,6 +68,7 @@ model DriverSettings {
   workingHours         String?  @map("working_hours")
   minimumFare          Int?     @map("minimum_fare")
   maxBookingDistanceKm Float?   @map("max_booking_distance_km")
+  isOnline             Boolean  @default(false) @map("is_online")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("driver_settings")

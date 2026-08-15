@@ -122,12 +122,20 @@ describe('Driver Profile & Announcements API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
-        driverName: 'Mustapha Zaxi',
-        phoneNumber: '+213555123456',
-        whatsappNumber: '+213555123456',
-        profilePhoto: 'https://example.com/photo.jpg',
-        description: 'Professional driver in BBA',
-        workingHours: '08:00 - 20:00',
+        status: 'success',
+        data: {
+          driver: {
+            driverName: 'Mustapha Zaxi',
+            phoneNumber: '+213555123456',
+            whatsappNumber: '+213555123456',
+            profilePhoto: 'https://example.com/photo.jpg',
+            description: 'Professional driver in BBA',
+            workingHours: '08:00 - 20:00',
+            isOnline: false,
+            ratingAverage: 0,
+            totalTrips: 0,
+          },
+        },
       });
     });
   });

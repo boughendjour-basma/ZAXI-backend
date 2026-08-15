@@ -26,6 +26,7 @@ router.patch('/pricing', DriverPricingController.updatePricing);
 // ─── Driver Profile Endpoints ────────────────────────────────────────────────
 router.get('/profile', DriverProfileController.getProfile);
 router.patch('/profile', DriverProfileController.updateProfile);
+router.patch('/availability', DriverProfileController.setAvailability);
 
 // ─── Driver Announcement Endpoints ───────────────────────────────────────────
 router.post('/announcements', AnnouncementController.createAnnouncement);

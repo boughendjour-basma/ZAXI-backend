@@ -12,6 +12,7 @@ export interface DriverProfileResult {
   workingHours: string | null;
   minimumFare: number | null;
   maxBookingDistanceKm: number | null;
+  isOnline: boolean;
   ratingAverage: number;
   totalRatings: number;
   totalTrips: number;
@@ -79,6 +80,7 @@ export class DriverProfileService {
       workingHours: settings?.workingHours ?? null,
       minimumFare: settings?.minimumFare ?? null,
       maxBookingDistanceKm: settings?.maxBookingDistanceKm ?? null,
+      isOnline: settings?.isOnline ?? false,
       ratingAverage,
       totalRatings,
       totalTrips,
@@ -145,9 +147,28 @@ export class DriverProfileService {
       workingHours: updated.workingHours,
       minimumFare: updated.minimumFare,
       maxBookingDistanceKm: updated.maxBookingDistanceKm,
+      isOnline: updated.isOnline,
       ratingAverage,
       totalRatings,
       totalTrips,
     };
+  }
+
+  /**
+   * Toggles or sets the driver's online/offline availability.
+   * Persisted to DB so the customer dashboard can read it.
+   */
+  static async setAvailability(isOnline: boolean): Promise<{ isOnline: boolean }> {
+    const updated = await prisma.driverSettings.upsert({
+      where: { id: 1 },
+      update: { isOnline },
+      create: {
+        id: 1,
+        driverName: DEFAULT_DRIVER_NAME,
+        phoneNumber: DEFAULT_PHONE,
+        isOnline,
+      },
+    });
+    return { isOnline: updated.isOnline };
   }
 }

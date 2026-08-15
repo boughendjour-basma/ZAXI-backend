@@ -13,7 +13,7 @@ export class AnnouncementController {
    */
   static async createAnnouncement(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const driverId = (req as any).user.id;
+      const driverId = req.user!.userId;
       const validatedData = createAnnouncementSchema.parse(req.body);
       const announcement = await AnnouncementService.createAnnouncement(driverId, validatedData);
       res.status(201).json(announcement);
@@ -28,7 +28,7 @@ export class AnnouncementController {
    */
   static async updateAnnouncement(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const driverId = (req as any).user.id;
+      const driverId = req.user!.userId;
       const id = req.params['id'] as string;
       const validatedData = updateAnnouncementSchema.parse(req.body);
       const updated = await AnnouncementService.updateAnnouncement(driverId, id, validatedData);
@@ -44,7 +44,7 @@ export class AnnouncementController {
    */
   static async deleteAnnouncement(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const driverId = (req as any).user.id;
+      const driverId = req.user!.userId;
       const id = req.params['id'] as string;
       await AnnouncementService.deleteAnnouncement(driverId, id);
       res.status(200).json({ message: 'Announcement removed successfully' });

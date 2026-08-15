@@ -73,6 +73,27 @@ class SocketServiceClass {
         }
       });
 
+      socket.on('driver:location', async (payload: { bookingId?: string; latitude: number; longitude: number; heading?: number; speed?: number; accuracy?: number }) => {
+        const user = socket.data.user;
+        if (!user || user.role !== 'DRIVER') return;
+        if (!payload || typeof payload.latitude !== 'number' || typeof payload.longitude !== 'number') return;
+
+        try {
+          if (payload.bookingId) {
+            const { DriverLocationService } = await import('../services/driver-location.service');
+            await DriverLocationService.updateDriverLocation(user.userId, payload.bookingId, {
+              latitude: payload.latitude,
+              longitude: payload.longitude,
+              heading: payload.heading,
+              speed: payload.speed,
+              accuracy: payload.accuracy,
+            });
+          }
+        } catch {
+          // Silent catch for background location emission
+        }
+      });
+
       socket.on('disconnect', () => {
         // Disconnected
       });
@@ -80,6 +101,11 @@ class SocketServiceClass {
 
     console.log('[Socket.IO]: Server initialized');
     return this.io;
+  }
+
+  /** Broadcast a new booking request to all connected clients / drivers. */
+  emitBookingNew(booking: object): void {
+    this.io?.emit('booking:new', booking);
   }
 
   /** Broadcast a new announcement event to all connected clients. */

@@ -31,21 +31,46 @@ export class DriverProfileController {
   }
 
   /**
+   * PATCH /api/driver/availability
+   * Sets driver online/offline status. Protected: DRIVER only.
+   */
+  static async setAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { isOnline } = req.body;
+      if (typeof isOnline !== 'boolean') {
+        res.status(400).json({ status: 'error', message: 'isOnline must be a boolean' });
+        return;
+      }
+      const result = await DriverProfileService.setAvailability(isOnline);
+      res.status(200).json({ status: 'success', data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/public/driver-profile
-   * Returns public driver profile info (name, phone, description, working hours).
+   * Returns public driver profile info including isOnline status.
    * No authentication required.
    */
   static async getPublicProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const profile = await DriverProfileService.getProfile();
-      // Expose only public-safe fields
       res.status(200).json({
-        driverName: profile.driverName,
-        phoneNumber: profile.phoneNumber,
-        whatsappNumber: profile.whatsappNumber,
-        profilePhoto: profile.profilePhoto,
-        description: profile.description,
-        workingHours: profile.workingHours,
+        status: 'success',
+        data: {
+          driver: {
+            driverName: profile.driverName,
+            phoneNumber: profile.phoneNumber,
+            whatsappNumber: profile.whatsappNumber,
+            profilePhoto: profile.profilePhoto,
+            description: profile.description,
+            workingHours: profile.workingHours,
+            isOnline: profile.isOnline,
+            ratingAverage: profile.ratingAverage,
+            totalTrips: profile.totalTrips,
+          },
+        },
       });
     } catch (error) {
       next(error);

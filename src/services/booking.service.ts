@@ -2,6 +2,7 @@ import { MapsService } from './maps.service';
 import { PricingService } from './pricing.service';
 import prisma from '../config/database';
 import { BookingStatus } from '@prisma/client';
+import { SocketService } from '../sockets/socket.service';
 
 export interface CreateBookingInput {
   pickup: {
@@ -85,14 +86,20 @@ export class BookingService {
       },
     });
 
-    return {
+    const formattedBooking = {
       ...booking,
+      bookingId: booking.id,
       pickupLat: booking.pickupLatitude,
       pickupLng: booking.pickupLongitude,
       dropoffLat: booking.destinationLatitude,
       dropoffLng: booking.destinationLongitude,
       dropoffAddress: booking.destinationAddress,
     };
+
+    // Emit real-time notification to drivers
+    SocketService.emitBookingNew(formattedBooking);
+
+    return formattedBooking;
   }
   static async getCustomerBookings(customerId: string, filters: { page: number, limit: number, status?: BookingStatus }) {
     const { page, limit, status } = filters;
