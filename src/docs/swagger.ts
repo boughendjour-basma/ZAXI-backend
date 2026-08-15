@@ -42,45 +42,6 @@ export const swaggerSpec = {
         },
       },
     },
-    '/api/auth/request-code': {
-      post: {
-        summary: 'Request SMS OTP verification code',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: { phone: { type: 'string', example: '+213555123456' } },
-                required: ['phone'],
-              },
-            },
-          },
-        },
-        responses: { 200: { description: 'OTP sent via SMS' } },
-      },
-    },
-    '/api/auth/verify-code': {
-      post: {
-        summary: 'Verify OTP code and authenticate',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  phone: { type: 'string', example: '+213555123456' },
-                  code: { type: 'string', example: '123456' },
-                },
-                required: ['phone', 'code'],
-              },
-            },
-          },
-        },
-        responses: { 200: { description: 'Returns JWT token' } },
-      },
-    },
     '/api/customers/me': {
       get: {
         summary: 'Get customer profile and trip stats',

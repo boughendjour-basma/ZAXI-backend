@@ -28,15 +28,25 @@ app.use(helmet());
 
 // CORS Configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*', // Update this in production
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: (origin, callback) => {
+    if (!origin || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    const allowed = process.env.CLIENT_URL || '*';
+    if (allowed === '*' || origin === allowed) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Rate Limiting
+// Rate Limiting — set higher threshold to support 5s polling from active client/driver dashboards
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  limit: process.env.NODE_ENV === 'production' ? 2000 : 10000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 });

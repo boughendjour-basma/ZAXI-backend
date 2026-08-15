@@ -1,5 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
+import { verifyToken } from '../utils/jwt';
+import prisma from '../config/database';
 
 /**
  * SocketService — Singleton Socket.IO server manager.
@@ -17,23 +19,62 @@ class SocketServiceClass {
   initialize(httpServer: HttpServer): SocketIOServer {
     this.io = new SocketIOServer(httpServer, {
       cors: {
-        origin: process.env.CLIENT_URL || '*',
+        origin: '*',
         methods: ['GET', 'POST'],
       },
     });
 
-    this.io.on('connection', (socket) => {
-      console.log(`[Socket.IO]: Client connected: ${socket.id}`);
+    this.io.use((socket, next) => {
+      try {
+        const rawToken =
+          socket.handshake.auth?.token ||
+          (socket.handshake.headers?.authorization
+            ? socket.handshake.headers.authorization.replace('Bearer ', '')
+            : null);
 
-      socket.on('join:booking', (bookingId: string) => {
-        if (bookingId) {
-          socket.join(`booking:${bookingId}`);
-          console.log(`[Socket.IO]: Socket ${socket.id} joined room booking:${bookingId}`);
+        if (!rawToken) {
+          socket.data.user = null;
+          return next();
+        }
+
+        const decoded = verifyToken(rawToken);
+        socket.data.user = decoded;
+        return next();
+      } catch {
+        socket.data.user = null;
+        return next();
+      }
+    });
+
+    this.io.on('connection', (socket) => {
+      socket.on('join:booking', async (bookingId: string) => {
+        if (!bookingId || typeof bookingId !== 'string') return;
+        const user = socket.data.user;
+
+        if (!user || !user.userId) return;
+
+        try {
+          const booking = await prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: { id: true, customerId: true, driverId: true },
+          });
+
+          if (!booking) return;
+
+          const isCustomerOwner = booking.customerId === user.userId;
+          const isAssignedDriver = booking.driverId === user.userId;
+          const isPlatformDriver = user.role === 'DRIVER';
+
+          if (isCustomerOwner || isAssignedDriver || isPlatformDriver) {
+            socket.join(`booking:${bookingId}`);
+          }
+        } catch {
+          // Silent error handling
         }
       });
 
       socket.on('disconnect', () => {
-        console.log(`[Socket.IO]: Client disconnected: ${socket.id}`);
+        // Disconnected
       });
     });
 
@@ -60,6 +101,18 @@ class SocketServiceClass {
   emitBookingAccepted(payload: { bookingId: string; status: string }): void {
     this.io?.to(`booking:${payload.bookingId}`).emit('booking:accepted', payload);
     this.io?.emit('booking:accepted', payload);
+  }
+
+  /** Emit booking:driver_arriving event to connected clients. */
+  emitBookingDriverArriving(payload: { bookingId: string; status: string }): void {
+    this.io?.to(`booking:${payload.bookingId}`).emit('booking:driver_arriving', payload);
+    this.io?.emit('booking:driver_arriving', payload);
+  }
+
+  /** Emit booking:driver_arrived event to connected clients. */
+  emitBookingDriverArrived(payload: { bookingId: string; status: string }): void {
+    this.io?.to(`booking:${payload.bookingId}`).emit('booking:driver_arrived', payload);
+    this.io?.emit('booking:driver_arrived', payload);
   }
 
   /** Emit booking:cancelled event to connected clients. */
@@ -108,7 +161,7 @@ class SocketServiceClass {
     this.io?.emit('payment:completed', payload);
   }
 
-  /** Emit auth:verified event after successful OTP verification. */
+  /** Emit auth:verified event after successful account creation. */
   emitAuthVerified(payload: { userId: string; phone: string; role: string }): void {
     this.io?.emit('auth:verified', payload);
   }

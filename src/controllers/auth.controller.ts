@@ -1,43 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
-import { registerSchema, loginRequestCodeSchema, loginVerifySchema } from '../validators/auth.validator';
-import { requestCodeSchema, verifyCodeSchema } from '../validators/phone.validator';
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordVerifySchema,
+  resetPasswordSchema,
+} from '../validators/auth.validator';
 
 export class AuthController {
   /**
-   * POST /api/auth/request-code
-   * Step 1 of sign-up: send OTP to phone.
-   */
-  static async requestCode(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { phone } = requestCodeSchema.parse(req.body);
-      const result = await AuthService.requestCode(phone);
-      res.status(200).json({ status: 'success', message: result.message });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * POST /api/auth/verify-code
-   * Step 2 of sign-up: verify OTP.
-   * New phone  → 200 { isNewUser: true, verificationToken }
-   * Existing   → 200 { isNewUser: false }
-   */
-  static async verifyCode(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { phone, code } = verifyCodeSchema.parse(req.body);
-      const result = await AuthService.verifyCode(phone, code);
-      res.status(200).json({ status: 'success', data: result });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
    * POST /api/auth/register
-   * Step 3 of sign-up: create CUSTOMER account using the verificationToken.
-   * Body: { verificationToken, name }
+   * Body: { phone, name, dateOfBirth, password }
    * Returns an auth JWT immediately after account creation.
    */
   static async register(req: Request, res: Response, next: NextFunction) {
@@ -51,30 +24,46 @@ export class AuthController {
   }
 
   /**
-   * POST /api/auth/login/request-code
-   * Step 1 of login: request a login OTP for any registered phone (customer or driver).
-   * Always returns generic success — never reveals whether the phone is registered.
+   * POST /api/auth/login
+   * Body: { phone, password }
+   * Returns auth JWT + user profile.
+   * Works for both CUSTOMER and DRIVER.
    */
-  static async loginRequestCode(req: Request, res: Response, next: NextFunction) {
+  static async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const { phone } = loginRequestCodeSchema.parse(req.body);
-      const result = await AuthService.loginRequestCode(phone);
-      res.status(200).json({ status: 'success', message: result.message });
+      const validatedData = loginSchema.parse(req.body);
+      const result = await AuthService.login(validatedData);
+      res.status(200).json({ status: 'success', data: result });
     } catch (error) {
       next(error);
     }
   }
 
   /**
-   * POST /api/auth/login/verify
-   * Step 2 of login: verify the login OTP and return auth JWT + user profile.
-   * Works identically for CUSTOMER and DRIVER.
+   * POST /api/auth/forgot-password/verify
+   * Body: { phone, name, dateOfBirth }
+   * Verifies identity and returns short-lived resetToken.
    */
-  static async loginVerify(req: Request, res: Response, next: NextFunction) {
+  static async forgotPasswordVerify(req: Request, res: Response, next: NextFunction) {
     try {
-      const { phone, code } = loginVerifySchema.parse(req.body);
-      const result = await AuthService.loginVerify(phone, code);
+      const validatedData = forgotPasswordVerifySchema.parse(req.body);
+      const result = await AuthService.forgotPasswordVerify(validatedData);
       res.status(200).json({ status: 'success', data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/auth/forgot-password/reset
+   * Body: { resetToken, newPassword }
+   * Resets password using resetToken.
+   */
+  static async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const validatedData = resetPasswordSchema.parse(req.body);
+      const result = await AuthService.resetPassword(validatedData);
+      res.status(200).json({ status: 'success', message: result.message });
     } catch (error) {
       next(error);
     }
@@ -97,7 +86,6 @@ export class AuthController {
 
   /**
    * POST /api/auth/logout
-   * Stateless logout — instructs the client to discard the JWT.
    */
   static async logout(_req: Request, res: Response, _next: NextFunction) {
     res.status(200).json({
@@ -106,3 +94,4 @@ export class AuthController {
     });
   }
 }
+

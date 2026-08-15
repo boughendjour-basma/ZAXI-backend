@@ -5,9 +5,23 @@ import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Rate limiter for OTP endpoints: max 5 requests per 15 minutes
-// Bypassed in test environment to avoid inter-test collisions
-const otpLimiter =
+// Rate limiter for auth endpoints: max 50 requests per 15 minutes
+const authLimiter =
+  process.env.NODE_ENV === 'test'
+    ? (_req: any, _res: any, next: any) => next()
+    : rateLimit({
+        windowMs: 15 * 60 * 1000,
+        limit: 50,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        message: {
+          status: 'error',
+          message: 'Too many authentication attempts. Please try again after 15 minutes',
+        },
+      });
+
+// Strict rate limiter for forgot password verification: max 5 requests per 15 minutes
+const forgotPasswordLimiter =
   process.env.NODE_ENV === 'test'
     ? (_req: any, _res: any, next: any) => next()
     : rateLimit({
@@ -17,23 +31,21 @@ const otpLimiter =
         legacyHeaders: false,
         message: {
           status: 'error',
-          message: 'Too many OTP requests. Please try again after 15 minutes',
+          message: 'Too many verification attempts. Please try again after 15 minutes',
         },
       });
 
-// ─── Sign-Up Flow ─────────────────────────────────────────────────────────────
-// Step 1: request-code → Step 2: verify-code → Step 3: register
-router.post('/request-code', otpLimiter, AuthController.requestCode);
-router.post('/verify-code', AuthController.verifyCode);
-router.post('/register', AuthController.register);
+// ─── Password Authentication ──────────────────────────────────────────────────
+router.post('/register', authLimiter, AuthController.register);
+router.post('/login', authLimiter, AuthController.login);
 
-// ─── Login Flow (Two-Step OTP for All Users) ──────────────────────────────────
-// Step 1: request login OTP → Step 2: verify OTP → receive JWT
-router.post('/login/request-code', otpLimiter, AuthController.loginRequestCode);
-router.post('/login/verify', AuthController.loginVerify);
+// ─── Password Recovery ────────────────────────────────────────────────────────
+router.post('/forgot-password/verify', forgotPasswordLimiter, AuthController.forgotPasswordVerify);
+router.post('/forgot-password/reset', authLimiter, AuthController.resetPassword);
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 router.get('/me', authenticate, AuthController.getCurrentUser);
 router.post('/logout', authenticate, AuthController.logout);
 
 export default router;
+

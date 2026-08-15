@@ -20,7 +20,7 @@ export class AuditLogService {
           action: data.action,
           entity: data.entity,
           entityId: data.entityId ?? null,
-          metadata: data.metadata ?? undefined,
+          metadata: data.metadata != null ? JSON.stringify(data.metadata) : undefined,
         },
       });
     } catch (error) {

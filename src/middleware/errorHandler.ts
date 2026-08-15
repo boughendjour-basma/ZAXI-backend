@@ -5,11 +5,11 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
   console.error('[Error]:', err);
 
   // Handle Zod Validation Errors
-  if (err instanceof ZodError) {
+  if (err instanceof ZodError || err?.name === 'ZodError' || Array.isArray(err?.issues)) {
     return res.status(400).json({
       status: 'error',
       message: 'Validation failed',
-      errors: err.issues,
+      errors: err.issues || err.errors,
     });
   }
 

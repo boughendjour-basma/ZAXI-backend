@@ -26,6 +26,28 @@ export class BookingService {
    * @returns The created booking record
    */
   static async createBooking(customerId: string, data: CreateBookingInput) {
+    // 0. Ensure customer has no active booking in progress
+    const activeBooking = await prisma.booking.findFirst({
+      where: {
+        customerId,
+        status: {
+          in: [
+            BookingStatus.PENDING,
+            BookingStatus.ACCEPTED,
+            BookingStatus.DRIVER_ARRIVING,
+            BookingStatus.ARRIVED,
+            BookingStatus.IN_PROGRESS,
+          ],
+        },
+      },
+    });
+
+    if (activeBooking) {
+      const error: any = new Error('You already have an active ride booking in progress.');
+      error.statusCode = 409;
+      throw error;
+    }
+
     const pickupCoords = { latitude: data.pickup.latitude, longitude: data.pickup.longitude };
     const destinationCoords = { latitude: data.destination.latitude, longitude: data.destination.longitude };
 
@@ -63,7 +85,14 @@ export class BookingService {
       },
     });
 
-    return booking;
+    return {
+      ...booking,
+      pickupLat: booking.pickupLatitude,
+      pickupLng: booking.pickupLongitude,
+      dropoffLat: booking.destinationLatitude,
+      dropoffLng: booking.destinationLongitude,
+      dropoffAddress: booking.destinationAddress,
+    };
   }
   static async getCustomerBookings(customerId: string, filters: { page: number, limit: number, status?: BookingStatus }) {
     const { page, limit, status } = filters;

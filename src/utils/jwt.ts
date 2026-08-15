@@ -10,13 +10,10 @@ export interface JwtPayload {
   phone?: string;
 }
 
-/**
- * Payload embedded in the short-lived verification token.
- * Carries `type: 'phone_verified'` to distinguish it from auth JWTs.
- */
-export interface VerificationPayload {
+export interface PasswordResetPayload {
+  userId: string;
   phone: string;
-  type: 'phone_verified';
+  type: 'password_reset';
 }
 
 export const generateToken = (payload: JwtPayload): string => {
@@ -30,31 +27,31 @@ export const verifyToken = (token: string): JwtPayload => {
 };
 
 /**
- * Generates a short-lived (10 min) verification token after successful OTP verification.
- * This token authorises account creation via POST /api/auth/register.
- * It carries `type: 'phone_verified'` so it can never be used as an auth token.
+ * Generates a short-lived (10 min) password reset token.
+ * Carries `type: 'password_reset'` so it cannot be used as an auth JWT.
  */
-export const generateVerificationToken = (phone: string): string => {
-  return jwt.sign({ phone, type: 'phone_verified' }, JWT_SECRET, { expiresIn: '10m' });
+export const generatePasswordResetToken = (userId: string, phone: string): string => {
+  return jwt.sign({ userId, phone, type: 'password_reset' }, JWT_SECRET, { expiresIn: '10m' });
 };
 
 /**
- * Verifies a phone verification token issued by generateVerificationToken.
- * Throws 401 if the token is invalid, expired, or is an auth token (wrong type).
+ * Verifies a password reset token.
+ * Throws 401 error if the token is invalid, expired, or of the wrong type.
  */
-export const verifyVerificationToken = (token: string): VerificationPayload => {
+export const verifyPasswordResetToken = (token: string): PasswordResetPayload => {
   let payload: any;
   try {
     payload = jwt.verify(token, JWT_SECRET);
   } catch {
-    const error: any = new Error('Invalid or expired verification token');
+    const error: any = new Error('Invalid or expired reset token');
     error.statusCode = 401;
     throw error;
   }
-  if (payload.type !== 'phone_verified') {
-    const error: any = new Error('Invalid or expired verification token');
+  if (payload.type !== 'password_reset') {
+    const error: any = new Error('Invalid or expired reset token');
     error.statusCode = 401;
     throw error;
   }
-  return payload as VerificationPayload;
+  return payload as PasswordResetPayload;
 };
+

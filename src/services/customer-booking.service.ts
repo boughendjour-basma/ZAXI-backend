@@ -10,8 +10,14 @@ const BOOKING_LIST_SELECT = {
   status: true,
   pickupAddress: true,
   destinationAddress: true,
+  pickupLatitude: true,
+  pickupLongitude: true,
+  destinationLatitude: true,
+  destinationLongitude: true,
   estimatedPrice: true,
   distanceKm: true,
+  durationMinutes: true,
+  pricingType: true,
   scheduledAt: true,
   createdAt: true,
   driverId: true,
@@ -50,9 +56,19 @@ const BOOKING_DETAIL_SELECT = {
   },
 };
 
-// Privacy filter: hide driver phone before ACCEPTED
+// Normalize coordinate aliases and privacy filter
 function applyPrivacyFilter(booking: any) {
   if (!booking) return null;
+
+  const normalized = {
+    ...booking,
+    pickupLat: booking.pickupLatitude,
+    pickupLng: booking.pickupLongitude,
+    dropoffLat: booking.destinationLatitude,
+    dropoffLng: booking.destinationLongitude,
+    dropoffAddress: booking.destinationAddress,
+  };
+
   const acceptedStatuses: BookingStatus[] = [
     BookingStatus.ACCEPTED,
     BookingStatus.DRIVER_ARRIVING,
@@ -62,11 +78,11 @@ function applyPrivacyFilter(booking: any) {
   ];
   if (!acceptedStatuses.includes(booking.status as BookingStatus) && booking.driver) {
     return {
-      ...booking,
+      ...normalized,
       driver: { id: booking.driver.id, name: booking.driver.name },
     };
   }
-  return booking;
+  return normalized;
 }
 
 export class CustomerBookingService {

@@ -53,12 +53,6 @@ export class QueueManager {
       case 'NOTIFICATION_DISPATCH':
         // Async notification processing
         break;
-      case 'SMS_OTP_DISPATCH':
-        // Background SMS processing
-        break;
-      case 'CLEANUP_EXPIRED_OTPS':
-        // Background DB cleanup
-        break;
       default:
         break;
     }

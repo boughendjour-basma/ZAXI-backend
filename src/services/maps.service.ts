@@ -29,9 +29,9 @@ export class MapsService {
     this.validateCoordinates(destination, 'Destination');
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
+    if (!apiKey || apiKey.includes('your-google-routes-api-key')) {
       const error: any = new Error('Google Maps API key is not configured');
-      error.statusCode = 500;
+      error.statusCode = 503;
       throw error;
     }
 
@@ -47,8 +47,9 @@ export class MapsService {
       travelMode: 'DRIVE'
     };
 
+    let response: Response;
     try {
-      const response = await fetch(url, {
+      response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,69 +58,90 @@ export class MapsService {
         },
         body: JSON.stringify(requestBody)
       });
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-            const error: any = new Error('External API authentication failed');
-            error.statusCode = 502; // Using 502 Bad Gateway to hide upstream details
-            throw error;
-        }
-        if (response.status === 429) {
-            const error: any = new Error('External API rate limit exceeded');
-            error.statusCode = 502;
-            throw error;
-        }
-        
-        const error: any = new Error('External routing service unavailable');
-        error.statusCode = 502;
-        throw error;
-      }
-
-      const data = await response.json();
-      
-      if (!data.routes || !data.routes.length) {
-         const error: any = new Error('No route found between the provided locations');
-         error.statusCode = 404; // Not Found
-         throw error;
-      }
-
-      const route = data.routes[0];
-      
-      if (route.distanceMeters === undefined || route.duration === undefined) {
-         const error: any = new Error('Malformed response from routing service');
-         error.statusCode = 502;
-         throw error;
-      }
-
-      // Convert distanceMeters to km
-      const distanceKm = route.distanceMeters / 1000;
-      
-      // Parse duration from formats like "1522s" or "3.5s"
-      const durationSeconds = parseFloat(route.duration.replace('s', ''));
-      if (Number.isNaN(durationSeconds)) {
-         const error: any = new Error('Malformed response from routing service');
-         error.statusCode = 502;
-         throw error;
-      }
-      
-      // Convert seconds to minutes with deterministic rounding
-      const durationMinutes = Math.round(durationSeconds / 60);
-
-      return {
-        distanceKm,
-        durationMinutes
-      };
-
-    } catch (error: any) {
-      if (error.statusCode) {
-        throw error; // Rethrow already structured application errors
-      }
-      // Handle network errors (e.g. DNS failure, connection refused)
-      // Never expose raw error strings which might leak api keys or URLs
-      const err: any = new Error('Failed to connect to external routing service');
-      err.statusCode = 502;
-      throw err;
+    } catch (_netErr) {
+      const error: any = new Error('Failed to connect to external routing service');
+      error.statusCode = 502;
+      throw error;
     }
+
+    if (!response.ok) {
+      let message = 'External routing service unavailable';
+      if (response.status === 401) {
+        message = 'External API authentication failed';
+      } else if (response.status === 429) {
+        message = 'External API rate limit exceeded';
+      }
+      const error: any = new Error(message);
+      error.statusCode = 502;
+      throw error;
+    }
+
+    let data: any;
+    try {
+      data = await response.json();
+    } catch (_jsonErr) {
+      const error: any = new Error('Malformed response from routing service');
+      error.statusCode = 502;
+      throw error;
+    }
+    
+    if (!data.routes || !data.routes.length) {
+      const error: any = new Error('No route found between the provided locations');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const route = data.routes[0];
+    
+    if (route.distanceMeters === undefined || route.duration === undefined) {
+      const error: any = new Error('Malformed response from routing service');
+      error.statusCode = 502;
+      throw error;
+    }
+
+    // Convert distanceMeters to km
+    const distanceKm = route.distanceMeters / 1000;
+    
+    // Parse duration from formats like "1522s" or "3.5s"
+    const durationSeconds = parseFloat(route.duration.replace('s', ''));
+    if (Number.isNaN(durationSeconds)) {
+      const error: any = new Error('Malformed response from routing service');
+      error.statusCode = 502;
+      throw error;
+    }
+    
+    // Convert seconds to minutes with deterministic rounding
+    const durationMinutes = Math.round(durationSeconds / 60);
+
+    return {
+      distanceKm,
+      durationMinutes
+    };
+  }
+
+  private static getFallbackRoute(pickup: Coordinates, destination: Coordinates): RouteResult {
+    const R = 6371; // Earth radius in km
+    const dLat = ((destination.latitude - pickup.latitude) * Math.PI) / 180;
+    const dLon = ((destination.longitude - pickup.longitude) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((pickup.latitude * Math.PI) / 180) *
+        Math.cos((destination.latitude * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const straightDistance = R * c;
+
+    // Road factor ~1.06 (matches Algerian highway network, e.g., Autoroute Est-Ouest A1)
+    const distanceKm = Math.max(0.5, Math.round(straightDistance * 1.06 * 10) / 10);
+    // Average speed ~90 km/h on highways, ~50 km/h in urban areas
+    const avgSpeed = distanceKm > 30 ? 90 : 50;
+    const durationMinutes = Math.max(1, Math.round((distanceKm / avgSpeed) * 60));
+
+    return {
+      distanceKm,
+      durationMinutes,
+    };
   }
 
   /**

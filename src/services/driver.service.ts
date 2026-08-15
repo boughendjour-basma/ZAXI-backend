@@ -1,6 +1,8 @@
 import prisma from '../config/database';
 import { BookingStatus } from '@prisma/client';
 import { BookingStateMachine } from '../utils/booking-state-machine';
+import { SocketService } from '../sockets/socket.service';
+import { NotificationService } from './notification.service';
 
 export class DriverService {
   /**
@@ -103,6 +105,42 @@ export class DriverService {
           status: nextStatus
         }
       });
+
+      // Emit socket event and save notification according to status
+      if (nextStatus === BookingStatus.DRIVER_ARRIVING) {
+        SocketService.emitBookingDriverArriving({ bookingId: updatedBooking.id, status: nextStatus });
+        NotificationService.create({
+          userId: updatedBooking.customerId,
+          type: 'booking:driver_arriving',
+          title: 'Chauffeur en route',
+          message: 'Votre chauffeur se dirige vers votre lieu de prise en charge.',
+        }).catch(console.error);
+      } else if (nextStatus === BookingStatus.ARRIVED) {
+        SocketService.emitBookingDriverArrived({ bookingId: updatedBooking.id, status: nextStatus });
+        NotificationService.create({
+          userId: updatedBooking.customerId,
+          type: 'booking:driver_arrived',
+          title: 'Chauffeur arrivé',
+          message: 'Votre chauffeur est arrivé au point de rendez-vous !',
+        }).catch(console.error);
+      } else if (nextStatus === BookingStatus.IN_PROGRESS) {
+        SocketService.emitBookingStarted({ bookingId: updatedBooking.id, status: nextStatus });
+        NotificationService.create({
+          userId: updatedBooking.customerId,
+          type: 'ride:started',
+          title: 'Course démarrée',
+          message: 'Votre course a démarré. Bon trajet avec ZAXI !',
+        }).catch(console.error);
+      } else if (nextStatus === BookingStatus.COMPLETED) {
+        SocketService.emitBookingCompleted({ bookingId: updatedBooking.id, status: nextStatus });
+        NotificationService.create({
+          userId: updatedBooking.customerId,
+          type: 'ride:completed',
+          title: 'Course terminée',
+          message: 'Votre course est terminée. Merci d\'avoir utilisé ZAXI !',
+        }).catch(console.error);
+      }
+
       return updatedBooking;
     } catch (error: any) {
       if (error.code === 'P2025') {

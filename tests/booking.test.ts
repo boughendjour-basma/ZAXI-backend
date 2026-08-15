@@ -32,6 +32,7 @@ describe('Booking Creation API Endpoint', () => {
       { userId: validCustomerId, email: 'test@example.com', role: 'CUSTOMER' },
       process.env.JWT_SECRET || 'fallback_secret'
     );
+    prismaMock.booking.findFirst.mockResolvedValue(null as any);
   });
 
   it('should create a booking successfully (tests 1, 2, 3, 4, 5, 6, 7)', async () => {

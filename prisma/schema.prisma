@@ -1,44 +1,33 @@
-// This is the Prisma schema for ZAXI - An Algerian ride-hailing platform.
-// Learn more about Prisma schema: https://pris.ly/d/prisma-schema
-
+// Prisma schema for ZAXI local development (SQLite)
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
 }
 
-// ─── Enums ───────────────────────────────────────────────────────────────────
-
-/// The role of a user in the system.
-/// CUSTOMER: Can create and manage bookings.
-/// DRIVER: The single operator who accepts and fulfills bookings.
-///          Also acts as the platform administrator — there is no separate admin role.
 enum Role {
   CUSTOMER
   DRIVER
 }
 
-/// The lifecycle status of a booking.
 enum BookingStatus {
-  PENDING         // Customer has requested a ride, waiting for driver
-  ACCEPTED        // Driver has accepted the ride request
-  REJECTED        // Driver has rejected the ride request
-  DRIVER_ARRIVING // Driver is on their way to the pickup location
-  ARRIVED         // Driver has arrived at the pickup location
-  IN_PROGRESS     // Driver has picked up the customer, ride is active
-  COMPLETED       // Ride has been finished successfully
-  CANCELLED       // Ride was cancelled by customer or driver
+  PENDING
+  ACCEPTED
+  REJECTED
+  DRIVER_ARRIVING
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
-/// The pricing mode applied to a booking.
 enum PricingType {
-  CITY     // Fixed city fare applied inside Bordj Bou Arréridj city limits
-  DISTANCE // Distance-based rate per km applied when pickup or destination is outside
+  CITY
+  DISTANCE
 }
 
-/// Category of driver announcements and trip offers.
 enum AnnouncementCategory {
   AIRPORT
   BEACH
@@ -47,37 +36,28 @@ enum AnnouncementCategory {
   OTHER
 }
 
-/// Payment method used for a completed ride.
 enum PaymentMethod {
-  CASH   // Physical cash payment — default for ZAXI
-  CARD   // Card terminal payment
-  ONLINE // Future: BaridiMob, CIB, Edahabia, Stripe, etc.
+  CASH
+  CARD
+  ONLINE
 }
 
-/// Lifecycle status of a payment record.
 enum PaymentStatus {
-  PENDING  // Awaiting confirmation (used for online flows)
-  PAID     // Payment confirmed and received
-  FAILED   // Payment attempt failed
-  REFUNDED // Payment was reversed
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
 }
 
-
-// ─── Models ──────────────────────────────────────────────────────────────────
-
-/// Represents global pricing configuration settings managed by the DRIVER.
-/// Only one record with id=1 exists in the database.
 model PricingSettings {
   id               Int      @id @default(1)
-  cityFlatFare     Int      @map("city_flat_fare")      // Price in whole DA for city rides
-  outsideRatePerKm Int      @map("outside_rate_per_km") // Rate in DA/km for outside rides
+  cityFlatFare     Int      @map("city_flat_fare")
+  outsideRatePerKm Int      @map("outside_rate_per_km")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@map("pricing_settings")
 }
 
-/// Represents the personal profile and service settings of the single independent DRIVER.
-/// Only one record with id=1 exists in the database.
 model DriverSettings {
   id                   Int      @id @default(1)
   driverName           String   @map("driver_name")
@@ -93,15 +73,14 @@ model DriverSettings {
   @@map("driver_settings")
 }
 
-/// Represents a user in the ZAXI platform.
-/// A user is either a CUSTOMER who books rides, or the single DRIVER who fulfills them.
 model User {
   id            String    @id @default(uuid())
   email         String?   @unique
-  passwordHash  String?   @map("password_hash") // Optional for phone OTP users
+  passwordHash  String?   @map("password_hash")
   name          String?
   phone         String    @unique
   phoneVerified Boolean   @default(false) @map("phone_verified")
+  dateOfBirth   DateTime? @map("date_of_birth")
   lastLoginAt   DateTime? @map("last_login_at")
   role          Role      @default(CUSTOMER)
   profilePhoto  String?   @map("profile_photo")
@@ -109,28 +88,18 @@ model User {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  // ─── Relations ───────────────────────────────────────────────────────
-  // A CUSTOMER creates bookings
   customerBookings  Booking[]          @relation("CustomerBookings")
-  // The DRIVER is assigned to bookings
   driverBookings    Booking[]          @relation("DriverBookings")
-  // Driver announcements/offers
   announcements     Announcement[]
-  // Customer saved places
   favorites         FavoriteLocation[]
-  // Customer ratings given
   ratingsGiven      Rating[]           @relation("CustomerRatings")
-  // Driver ratings received
   ratingsReceived   Rating[]           @relation("DriverRatings")
-  // Notifications
   notifications     Notification[]
-  // Audit logs
   auditLogs         AuditLog[]
 
   @@map("users")
 }
 
-/// Represents special trip offers and announcements published by the driver.
 model Announcement {
   id                  String               @id @default(uuid())
   driverId            String               @map("driver_id")
@@ -154,56 +123,45 @@ model Announcement {
   @@map("announcements")
 }
 
-/// Represents a ride booking in the ZAXI platform.
-/// Each booking is created by a CUSTOMER and optionally assigned to the DRIVER.
 model Booking {
-  id             String        @id @default(uuid())
-  status         BookingStatus @default(PENDING)
-  pricingType    PricingType   @default(DISTANCE) @map("pricing_type")
+  id                   String        @id @default(uuid())
+  status               BookingStatus @default(PENDING)
+  pricingType          PricingType   @default(DISTANCE) @map("pricing_type")
+  cityFlatFareUsed     Int?          @map("city_flat_fare_used")
+  outsideRatePerKmUsed Int?          @map("outside_rate_per_km_used")
 
-  // ─── Pricing Audit Snapshot ─────────────────────────────────────────
-  cityFlatFareUsed     Int? @map("city_flat_fare_used")     // Historical snapshot of city flat fare
-  outsideRatePerKmUsed Int? @map("outside_rate_per_km_used") // Historical snapshot of outside rate/km
-
-  // ─── Location Data ───────────────────────────────────────────────────
-  pickupLatitude       Decimal       @map("pickup_latitude")    @db.Decimal(10, 7)
-  pickupLongitude      Decimal       @map("pickup_longitude")   @db.Decimal(10, 7)
-  destinationLatitude  Decimal       @map("destination_latitude")  @db.Decimal(10, 7)
-  destinationLongitude Decimal       @map("destination_longitude") @db.Decimal(10, 7)
+  pickupLatitude       Float         @map("pickup_latitude")
+  pickupLongitude      Float         @map("pickup_longitude")
+  destinationLatitude  Float         @map("destination_latitude")
+  destinationLongitude Float         @map("destination_longitude")
   pickupAddress        String        @map("pickup_address")
   destinationAddress   String        @map("destination_address")
 
-  // ─── Trip Metrics ────────────────────────────────────────────────────
-  distanceKm      Decimal      @map("distance_km") @db.Decimal(10, 2)   // Distance in kilometers
-  estimatedPrice  Int          @map("estimated_price") // Price in whole Algerian Dinar (DA)
-  durationMinutes Int          @map("duration_minutes") // Estimated trip duration
+  distanceKm      Float        @map("distance_km")
+  estimatedPrice  Int          @map("estimated_price")
+  durationMinutes Int          @map("duration_minutes")
   scheduledAt     DateTime?    @map("scheduled_at")
 
-  // ─── Timestamps ──────────────────────────────────────────────────────
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  // ─── Relations ───────────────────────────────────────────────────────
   customerId     String        @map("customer_id")
   customer       User          @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Cascade)
 
-  driverId       String?         @map("driver_id")
-  driver         User?           @relation("DriverBookings", fields: [driverId], references: [id], onDelete: SetNull)
+  driverId       String?       @map("driver_id")
+  driver         User?         @relation("DriverBookings", fields: [driverId], references: [id], onDelete: SetNull)
 
   driverLocation DriverLocation?
   payment        Payment?
   rating         Rating?
 
-  // ─── Indexes ─────────────────────────────────────────────────────────
   @@index([customerId])
   @@index([driverId])
   @@index([status])
   @@index([createdAt])
-
   @@map("bookings")
 }
 
-/// Represents real-time driver location and telemetry for an active ride.
 model DriverLocation {
   id        String   @id @default(uuid())
   bookingId String   @unique @map("booking_id")
@@ -222,17 +180,14 @@ model DriverLocation {
   @@map("driver_locations")
 }
 
-/// Represents a financial payment record for a completed ride.
-/// Each booking can have at most one payment (enforced via @unique on bookingId).
-/// Amount is always sourced from the booking — never from the client.
 model Payment {
   id                   String        @id @default(uuid())
   bookingId            String        @unique @map("booking_id")
-  amount               Int                               // Always mirrors booking.estimatedPrice at time of payment
+  amount               Int
   paymentMethod        PaymentMethod @map("payment_method")
   status               PaymentStatus @default(PENDING)
   paidAt               DateTime?     @map("paid_at")
-  transactionReference String?       @map("transaction_reference") // For future online gateway references
+  transactionReference String?       @map("transaction_reference")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
@@ -244,27 +199,10 @@ model Payment {
   @@map("payments")
 }
 
-/// Represents an SMS OTP verification session.
-/// Plaintext OTP codes are NEVER stored — only argon2 hashes (codeHash).
-model OTPVerification {
-  id        String   @id @default(uuid())
-  phone     String
-  codeHash  String   @map("code_hash")
-  attempts  Int      @default(0)
-  expiresAt DateTime @map("expires_at")
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([phone])
-  @@index([expiresAt])
-  @@map("otp_verifications")
-}
-
-/// Customer saved/favorite locations (Home, Work, etc.).
 model FavoriteLocation {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  name      String   // e.g. "Home", "Work", "Airport"
+  name      String
   address   String
   latitude  Float
   longitude Float
@@ -277,13 +215,12 @@ model FavoriteLocation {
   @@map("favorite_locations")
 }
 
-/// Customer rating given to the driver after a completed ride.
 model Rating {
   id         String   @id @default(uuid())
-  bookingId  String   @unique @map("booking_id") // One rating per completed booking
+  bookingId  String   @unique @map("booking_id")
   customerId String   @map("customer_id")
   driverId   String   @map("driver_id")
-  score      Int      // 1-5
+  score      Int
   comment    String?
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -296,12 +233,10 @@ model Rating {
   @@map("ratings")
 }
 
-/// Persistent notification record stored when a lifecycle event occurs.
-/// Ensures customers see events even when offline.
 model Notification {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  type      String   // e.g. "booking:accepted", "ride:started"
+  type      String
   title     String
   message   String
   read      Boolean  @default(false)
@@ -315,14 +250,13 @@ model Notification {
   @@map("notifications")
 }
 
-/// Audit log for recording critical administrative and system actions.
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String?  @map("user_id")
   action    String
   entity    String
   entityId  String?  @map("entity_id")
-  metadata  Json?
+  metadata  String?
   createdAt DateTime @default(now()) @map("created_at")
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -333,4 +267,3 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
-
