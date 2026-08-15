@@ -80,13 +80,15 @@ class SocketServiceClass {
 
         try {
           if (payload.bookingId) {
-            const { DriverLocationService } = await import('../services/driver-location.service');
-            await DriverLocationService.updateDriverLocation(user.userId, payload.bookingId, {
+            this.emitDriverLocationUpdate(payload.bookingId, {
+              bookingId: payload.bookingId,
               latitude: payload.latitude,
               longitude: payload.longitude,
               heading: payload.heading,
               speed: payload.speed,
               accuracy: payload.accuracy,
+              updatedAt: new Date().toISOString(),
+              lastSeen: new Date().toISOString(),
             });
           }
         } catch {
