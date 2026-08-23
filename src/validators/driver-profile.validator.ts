@@ -49,3 +49,9 @@ export const updateDriverProfileSchema = z
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one profile field must be provided to update',
   });
+
+export const setAvailabilitySchema = z.object({
+  isOnline: z.boolean({
+    error: 'isOnline must be a boolean',
+  }),
+});

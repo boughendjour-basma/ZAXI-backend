@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { BookingController } from '../controllers/booking.controller';
 import { DriverLocationController } from '../controllers/driver-location.controller';
 import { PaymentController } from '../controllers/payment.controller';
-import { authenticate } from '../middleware/auth.middleware';
-
+import { authenticate, requireRole } from '../middleware/auth.middleware';
+import { Role } from '@prisma/client';
 import { RatingController } from '../controllers/rating.controller';
 
 const router = Router();
 
-// Apply authentication middleware to all routes in this router
+// Apply authentication middleware to booking routes
 router.use(authenticate);
 
 // Protected routes (require valid JWT)
