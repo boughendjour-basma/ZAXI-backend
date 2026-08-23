@@ -1,11 +1,12 @@
 import { PrismaClient, Role } from '@prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import argon2 from 'argon2';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const adapter = new PrismaBetterSqlite3({ url: 'dev.db' });
+const url = process.env.DATABASE_URL || 'file:dev.db';
+const adapter = new PrismaLibSql({ url });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
