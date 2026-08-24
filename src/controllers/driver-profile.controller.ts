@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { DriverProfileService } from '../services/driver-profile.service';
-import { updateDriverProfileSchema } from '../validators/driver-profile.validator';
+import { updateDriverProfileSchema, setAvailabilitySchema } from '../validators/driver-profile.validator';
 
 export class DriverProfileController {
   /**
@@ -36,11 +36,7 @@ export class DriverProfileController {
    */
   static async setAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { isOnline } = req.body;
-      if (typeof isOnline !== 'boolean') {
-        res.status(400).json({ status: 'error', message: 'isOnline must be a boolean' });
-        return;
-      }
+      const { isOnline } = setAvailabilitySchema.parse(req.body);
       const result = await DriverProfileService.setAvailability(isOnline);
       res.status(200).json({ status: 'success', data: result });
     } catch (error) {
