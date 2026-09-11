@@ -11,9 +11,13 @@ const coordinateSchema = z.object({
     .refine((val) => Number.isFinite(val), { message: 'Longitude must be a finite number' })
 });
 
+const estimateCoordinateSchema = coordinateSchema.extend({
+  address: z.string().optional()
+});
+
 export const estimateSchema = z.object({
-  pickup: coordinateSchema,
-  destination: coordinateSchema
+  pickup: estimateCoordinateSchema,
+  destination: estimateCoordinateSchema
 });
 
 const locationSchema = coordinateSchema.extend({
@@ -26,7 +30,10 @@ export const createBookingSchema = z.object({
   scheduledAt: z.string().datetime().optional().refine((val) => {
     if (!val) return true;
     return new Date(val).getTime() >= Date.now();
-  }, { message: 'scheduledAt must not be in the past' })
+  }, { message: 'scheduledAt must not be in the past' }),
+  offerPrice: z.number().int().positive().optional(),
+  notes: z.string().max(1000).optional(),
+  announcementId: z.string().uuid().optional(),
 }).strict();
 
 export const paginationQuerySchema = z.object({

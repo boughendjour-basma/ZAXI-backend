@@ -57,7 +57,9 @@ export class DriverProfileController {
         data: {
           driver: {
             driverName: profile.driverName,
+            name: profile.driverName,
             phoneNumber: profile.phoneNumber,
+            phone: profile.phoneNumber,
             whatsappNumber: profile.whatsappNumber,
             profilePhoto: profile.profilePhoto,
             description: profile.description,
@@ -65,6 +67,13 @@ export class DriverProfileController {
             isOnline: profile.isOnline,
             ratingAverage: profile.ratingAverage,
             totalTrips: profile.totalTrips,
+            vehicleMake: profile.vehicleMake,
+            vehicleModel: profile.vehicleModel,
+            vehicleColor: profile.vehicleColor,
+            vehiclePlate: profile.vehiclePlate,
+            ccpNumber: profile.ccpNumber,
+            ccpKey: profile.ccpKey,
+            carPhotos: profile.carPhotos,
           },
         },
       });

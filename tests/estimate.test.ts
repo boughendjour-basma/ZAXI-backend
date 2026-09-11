@@ -53,7 +53,13 @@ describe('Estimate API Endpoint', () => {
       estimatedPrice: 220,
     });
     expect(MapsService.getRoute).toHaveBeenCalledWith(validPickup, validDestination);
-    expect(PricingService.calculatePrice).toHaveBeenCalledWith(validPickup, validDestination, 5.5);
+    expect(PricingService.calculatePrice).toHaveBeenCalledWith(
+      validPickup,
+      validDestination,
+      5.5,
+      undefined,
+      undefined
+    );
   });
 
   it('should reject invalid pickup coordinates', async () => {

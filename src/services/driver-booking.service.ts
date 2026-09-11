@@ -1,5 +1,5 @@
 import prisma from '../config/database';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { BookingStateMachine } from '../utils/booking-state-machine';
 import { SocketService } from '../sockets/socket.service';
 import { DriverLocationService } from './driver-location.service';
@@ -299,6 +299,26 @@ export class DriverBookingService {
         'Ride completed',
         'Your ride has been completed. Thank you for choosing ZAXI!'
       );
+
+      // Record cash payment settlement
+      try {
+        await prisma.payment.upsert({
+          where: { bookingId },
+          create: {
+            bookingId,
+            amount: updated.estimatedPrice,
+            paymentMethod: PaymentMethod.CASH,
+            status: PaymentStatus.PAID,
+            paidAt: new Date(),
+          },
+          update: {
+            status: PaymentStatus.PAID,
+            paidAt: new Date(),
+          },
+        });
+      } catch (paymentErr) {
+        console.error('Failed to record cash payment settlement:', paymentErr);
+      }
 
       await DriverLocationService.cleanupDriverLocation(bookingId);
 

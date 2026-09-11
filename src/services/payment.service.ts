@@ -236,81 +236,92 @@ export class PaymentService {
     filters: { from?: string; to?: string }
   ) {
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(startOfToday);
-    startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay());
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const ALGERIA_OFFSET_MS = 1 * 60 * 60 * 1000; // UTC+1
+    const localNow = new Date(now.getTime() + ALGERIA_OFFSET_MS);
+    const localYear = localNow.getUTCFullYear();
+    const localMonth = localNow.getUTCMonth();
+    const localDate = localNow.getUTCDate();
+    const localDay = localNow.getUTCDay();
 
-    // Build date filter for custom range query
+    const startOfToday = new Date(Date.UTC(localYear, localMonth, localDate) - ALGERIA_OFFSET_MS);
+    const startOfWeek = new Date(Date.UTC(localYear, localMonth, localDate - localDay) - ALGERIA_OFFSET_MS);
+    const startOfMonth = new Date(Date.UTC(localYear, localMonth, 1) - ALGERIA_OFFSET_MS);
+
     const customWhere: any = {
-      booking: { driverId, status: BookingStatus.COMPLETED },
-      status: PaymentStatus.PAID,
+      driverId,
+      status: BookingStatus.COMPLETED,
     };
+
     if (filters.from || filters.to) {
-      customWhere.paidAt = {};
-      if (filters.from) customWhere.paidAt.gte = new Date(filters.from);
-      if (filters.to) customWhere.paidAt.lte = new Date(filters.to);
+      customWhere.updatedAt = {};
+      if (filters.from) customWhere.updatedAt.gte = new Date(filters.from);
+      if (filters.to) customWhere.updatedAt.lte = new Date(filters.to);
     }
 
-    const [todayPayments, weekPayments, monthPayments, totalPayments, customPayments] =
-      await Promise.all([
-        // Today
-        prisma.payment.findMany({
-          where: {
-            booking: { driverId, status: BookingStatus.COMPLETED },
-            status: PaymentStatus.PAID,
-            paidAt: { gte: startOfToday },
-          },
-          select: { amount: true },
-        }),
-        // This week
-        prisma.payment.findMany({
-          where: {
-            booking: { driverId, status: BookingStatus.COMPLETED },
-            status: PaymentStatus.PAID,
-            paidAt: { gte: startOfWeek },
-          },
-          select: { amount: true },
-        }),
-        // This month
-        prisma.payment.findMany({
-          where: {
-            booking: { driverId, status: BookingStatus.COMPLETED },
-            status: PaymentStatus.PAID,
-            paidAt: { gte: startOfMonth },
-          },
-          select: { amount: true },
-        }),
-        // All time
-        prisma.payment.findMany({
-          where: {
-            booking: { driverId, status: BookingStatus.COMPLETED },
-            status: PaymentStatus.PAID,
-          },
-          select: { amount: true },
-        }),
-        // Custom range (if provided)
-        prisma.payment.findMany({
-          where: customWhere,
-          select: { amount: true },
-        }),
-      ]);
+    const [
+      todayRides,
+      weekRides,
+      monthRides,
+      totalRides,
+      customRides,
+    ] = await Promise.all([
+      // Today completed cash rides
+      prisma.booking.findMany({
+        where: {
+          driverId,
+          status: BookingStatus.COMPLETED,
+          updatedAt: { gte: startOfToday },
+        },
+        select: { estimatedPrice: true },
+      }),
+      // This week completed cash rides
+      prisma.booking.findMany({
+        where: {
+          driverId,
+          status: BookingStatus.COMPLETED,
+          updatedAt: { gte: startOfWeek },
+        },
+        select: { estimatedPrice: true },
+      }),
+      // This month completed cash rides
+      prisma.booking.findMany({
+        where: {
+          driverId,
+          status: BookingStatus.COMPLETED,
+          updatedAt: { gte: startOfMonth },
+        },
+        select: { estimatedPrice: true },
+      }),
+      // All time completed cash rides
+      prisma.booking.findMany({
+        where: {
+          driverId,
+          status: BookingStatus.COMPLETED,
+        },
+        select: { estimatedPrice: true },
+      }),
+      // Custom range completed cash rides
+      prisma.booking.findMany({
+        where: customWhere,
+        select: { estimatedPrice: true },
+      }),
+    ]);
 
-    const sum = (payments: { amount: number }[]) =>
-      payments.reduce((acc, p) => acc + p.amount, 0);
+    const sumEarnings = (rides: { estimatedPrice?: number; amount?: number }[] | undefined) =>
+      (rides || []).reduce((acc, r) => acc + (r?.estimatedPrice ?? (r as any)?.amount ?? 0), 0);
 
-    const total = sum(totalPayments);
-    const count = totalPayments.length;
+    const total = sumEarnings(totalRides);
+    const completedRides = (totalRides || []).length;
 
     return {
-      today: sum(todayPayments),
-      week: sum(weekPayments),
-      month: sum(monthPayments),
+      today: sumEarnings(todayRides),
+      week: sumEarnings(weekRides),
+      month: sumEarnings(monthRides),
       total,
-      completedRides: count,
-      averageRideValue: count > 0 ? Math.round(total / count) : 0,
+      completedRides,
+      averageRideValue: completedRides > 0 ? Math.round(total / completedRides) : 0,
       ...(filters.from || filters.to
-        ? { customRange: sum(customPayments) }
+        ? { customRange: sumEarnings(customRides) }
         : {}),
     };
   }

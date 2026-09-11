@@ -177,7 +177,7 @@ describe('Driver Pricing Settings API Endpoint (/api/driver/pricing)', () => {
         .set('Authorization', `Bearer ${customerToken}`)
         .send({
           pickup: bbaCenter,
-          destination: elAchir,
+          destination: { latitude: 36.1900, longitude: 5.4100 },
         });
 
       expect(response.status).toBe(200);

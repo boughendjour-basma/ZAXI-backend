@@ -1,11 +1,11 @@
-// Prisma schema for ZAXI local development (SQLite)
+// Prisma schema for ZAXI production (PostgreSQL)
 generator client {
   provider   = "prisma-client-js"
   engineType = "library"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 enum Role {
@@ -70,6 +70,13 @@ model DriverSettings {
   minimumFare          Int?     @map("minimum_fare")
   maxBookingDistanceKm Float?   @map("max_booking_distance_km")
   isOnline             Boolean  @default(false) @map("is_online")
+  vehicleMake          String?  @map("vehicle_make")
+  vehicleModel         String?  @map("vehicle_model")
+  vehicleColor         String?  @map("vehicle_color")
+  vehiclePlate         String?  @map("vehicle_plate")
+  ccpNumber            String?  @map("ccp_number")
+  ccpKey               String?  @map("ccp_key")
+  carPhotos            String?  @map("car_photos")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("driver_settings")

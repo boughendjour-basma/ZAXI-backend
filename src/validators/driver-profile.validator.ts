@@ -7,10 +7,21 @@ export const updateDriverProfileSchema = z
       .min(1, 'Driver name cannot be empty')
       .max(100, 'Driver name must be at most 100 characters')
       .optional(),
+    name: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional(),
     phoneNumber: z
       .string()
       .min(1, 'Phone number cannot be empty')
       .max(20, 'Phone number must be at most 20 characters')
+      .regex(/^\+?[0-9\s\-()]+$/, 'Phone number must be a valid format')
+      .optional(),
+    phone: z
+      .string()
+      .min(1)
+      .max(20)
       .regex(/^\+?[0-9\s\-()]+$/, 'Phone number must be a valid format')
       .optional(),
     whatsappNumber: z
@@ -21,7 +32,6 @@ export const updateDriverProfileSchema = z
       .optional(),
     profilePhoto: z
       .string()
-      .url('Profile photo must be a valid URL')
       .nullable()
       .optional(),
     description: z
@@ -43,6 +53,40 @@ export const updateDriverProfileSchema = z
     maxBookingDistanceKm: z
       .number()
       .positive('Max booking distance must be a positive number')
+      .nullable()
+      .optional(),
+    vehicleMake: z
+      .string()
+      .max(100)
+      .nullable()
+      .optional(),
+    vehicleModel: z
+      .string()
+      .max(100)
+      .nullable()
+      .optional(),
+    vehicleColor: z
+      .string()
+      .max(100)
+      .nullable()
+      .optional(),
+    vehiclePlate: z
+      .string()
+      .max(50)
+      .nullable()
+      .optional(),
+    ccpNumber: z
+      .string()
+      .max(50)
+      .nullable()
+      .optional(),
+    ccpKey: z
+      .string()
+      .max(10)
+      .nullable()
+      .optional(),
+    carPhotos: z
+      .union([z.string(), z.array(z.string())])
       .nullable()
       .optional(),
   })

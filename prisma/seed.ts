@@ -1,12 +1,15 @@
 import { PrismaClient, Role } from '@prisma/client';
-import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import argon2 from 'argon2';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const url = process.env.DATABASE_URL || 'file:dev.db';
-const adapter = new PrismaLibSql({ url });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
@@ -42,36 +45,21 @@ async function main() {
   console.log(`   Name:  ${driver.name}`);
   console.log(`   Phone: ${driver.phone}`);
   console.log(`   Role:  ${driver.role}`);
-
-  const customerPhone = process.env.CUSTOMER_PHONE || '+213666000000';
-  const customerPassword = process.env.CUSTOMER_PASSWORD || 'password123';
-  const customerPasswordHash = await argon2.hash(customerPassword);
-
-  const customer = await prisma.user.upsert({
-    where: { phone: customerPhone },
+  // Sync driver settings
+  await prisma.driverSettings.upsert({
+    where: { id: 1 },
     update: {
-      name: 'Client Test',
-      passwordHash: customerPasswordHash,
-      dateOfBirth: new Date('1995-05-15'),
-      role: Role.CUSTOMER,
-      phoneVerified: true,
+      driverName,
+      phoneNumber: driverPhone,
     },
     create: {
-      name: 'Client Test',
-      phone: customerPhone,
-      passwordHash: customerPasswordHash,
-      dateOfBirth: new Date('1995-05-15'),
-      role: Role.CUSTOMER,
-      phoneVerified: true,
+      id: 1,
+      driverName,
+      phoneNumber: driverPhone,
+      isOnline: true,
     },
   });
-
-  console.log(`✅ Customer account seeded successfully:`);
-  console.log(`   ID:    ${customer.id}`);
-  console.log(`   Name:  ${customer.name}`);
-  console.log(`   Phone: ${customer.phone}`);
-  console.log(`   Role:  ${customer.role}`);
-
+  console.log(`✅ Driver settings synced with ${driverPhone}`);
   const pricingSettings = await prisma.pricingSettings.upsert({
     where: { id: 1 },
     update: {},
@@ -90,10 +78,12 @@ async function main() {
 main()
   .then(async () => {
     await prisma.$disconnect();
+    await pool.end();
     console.log('🌱 Seed completed.');
   })
   .catch(async (e) => {
     console.error('❌ Seed failed:', e);
     await prisma.$disconnect();
+    await pool.end();
     process.exit(1);
   });

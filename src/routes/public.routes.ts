@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import { DriverProfileController } from '../controllers/driver-profile.controller';
 import { AnnouncementController } from '../controllers/announcement.controller';
+import { BookingController } from '../controllers/booking.controller';
+import { PricingSettingsService } from '../services/pricing-settings.service';
 
 const router = Router();
+
+// ─── Public Estimate ────────────────────────────────────────────────────────
+// POST /api/public/estimate — calculate route, distance and estimated price
+router.post('/estimate', BookingController.getEstimate);
 
 // ─── Public Driver Profile ──────────────────────────────────────────────────
 // GET /api/public/driver-profile — public driver profile (customers, no auth)
@@ -34,6 +40,23 @@ router.post('/reverse-geocode', async (req, res) => {
       status: 'success',
       data: { address: 'Bordj Bou Arréridj' },
     });
+  }
+});
+
+// ─── Public Pricing Settings ───────────────────────────────────────────────
+// GET /api/public/pricing — public current pricing settings for customer estimate & booking
+router.get('/pricing', async (_req, res, next) => {
+  try {
+    const settings = await PricingSettingsService.getSettings();
+    res.status(200).json({
+      status: 'success',
+      data: {
+        cityFlatFare: settings.cityFlatFare,
+        outsideRatePerKm: settings.outsideRatePerKm,
+      },
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

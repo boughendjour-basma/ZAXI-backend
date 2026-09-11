@@ -321,7 +321,8 @@ describe('Payments, Ride Receipts & Booking History API', () => {
   // ─── 6. Driver Earnings Dashboard ─────────────────────────────────────────
   describe('GET /api/driver/earnings — Earnings Dashboard', () => {
     it('should calculate today, week, month, and total earnings for driver', async () => {
-      const mockPayments = [{ amount: 2000 }, { amount: 1500 }];
+      const mockPayments = [{ estimatedPrice: 2000, amount: 2000 }, { estimatedPrice: 1500, amount: 1500 }];
+      prismaMock.booking.findMany.mockResolvedValue(mockPayments as any);
       prismaMock.payment.findMany.mockResolvedValue(mockPayments as any);
 
       const res = await request(app)

@@ -29,21 +29,42 @@ export class MapsService {
     this.validateCoordinates(destination, 'Destination');
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey || apiKey.includes('your-google-routes-api-key')) {
+
+    if (!apiKey) {
       const error: any = new Error('Google Maps API key is not configured');
       error.statusCode = 503;
       throw error;
     }
 
+    // When GOOGLE_MAPS_API_KEY is placeholder or mock-key -> use free OSRM / Haversine fallback
+    if (apiKey.includes('your-google-routes-api-key') || apiKey === 'mock-key') {
+      try {
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickup.longitude},${pickup.latitude};${destination.longitude},${destination.latitude}?overview=false`;
+        const res = await fetch(osrmUrl, {
+          headers: { 'User-Agent': 'ZaxiAlgeria/1.0 (RideApp)' }
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json.code === 'Ok' && json.routes && json.routes.length > 0) {
+            const bestRoute = json.routes[0];
+            const distanceKm = Math.max(0.5, Math.round((bestRoute.distance / 1000) * 10) / 10);
+            const durationMinutes = Math.max(1, Math.round(bestRoute.duration / 60));
+            return { distanceKm, durationMinutes };
+          }
+        }
+      } catch {
+        // fall back to Haversine
+      }
+
+      return this.getFallbackRoute(pickup, destination);
+    }
+
+    // When GOOGLE_MAPS_API_KEY is explicitly configured, call Google Routes API with full error validation
     const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-    
     const requestBody = {
-      origin: {
-        location: { latLng: pickup }
-      },
-      destination: {
-        location: { latLng: destination }
-      },
+      origin: { location: { latLng: pickup } },
+      destination: { location: { latLng: destination } },
       travelMode: 'DRIVE'
     };
 
@@ -84,7 +105,7 @@ export class MapsService {
       error.statusCode = 502;
       throw error;
     }
-    
+
     if (!data.routes || !data.routes.length) {
       const error: any = new Error('No route found between the provided locations');
       error.statusCode = 404;
@@ -92,25 +113,21 @@ export class MapsService {
     }
 
     const route = data.routes[0];
-    
+
     if (route.distanceMeters === undefined || route.duration === undefined) {
       const error: any = new Error('Malformed response from routing service');
       error.statusCode = 502;
       throw error;
     }
 
-    // Convert distanceMeters to km
     const distanceKm = route.distanceMeters / 1000;
-    
-    // Parse duration from formats like "1522s" or "3.5s"
     const durationSeconds = parseFloat(route.duration.replace('s', ''));
     if (Number.isNaN(durationSeconds)) {
       const error: any = new Error('Malformed response from routing service');
       error.statusCode = 502;
       throw error;
     }
-    
-    // Convert seconds to minutes with deterministic rounding
+
     const durationMinutes = Math.round(durationSeconds / 60);
 
     return {
@@ -132,8 +149,8 @@ export class MapsService {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const straightDistance = R * c;
 
-    // Road factor ~1.06 (matches Algerian highway network, e.g., Autoroute Est-Ouest A1)
-    const distanceKm = Math.max(0.5, Math.round(straightDistance * 1.06 * 10) / 10);
+    // Road factor ~1.20 for Algerian inter-wilaya roads and highways (Autoroute Est-Ouest, RN)
+    const distanceKm = Math.max(0.5, Math.round(straightDistance * 1.20 * 10) / 10);
     // Average speed ~90 km/h on highways, ~50 km/h in urban areas
     const avgSpeed = distanceKm > 30 ? 90 : 50;
     const durationMinutes = Math.max(1, Math.round((distanceKm / avgSpeed) * 60));

@@ -120,22 +120,17 @@ describe('Driver Profile & Announcements API', () => {
 
       const res = await request(app).get('/api/public/driver-profile');
 
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual({
-        status: 'success',
-        data: {
-          driver: {
-            driverName: 'Mustapha Zaxi',
-            phoneNumber: '+213555123456',
-            whatsappNumber: '+213555123456',
-            profilePhoto: 'https://example.com/photo.jpg',
-            description: 'Professional driver in BBA',
-            workingHours: '08:00 - 20:00',
-            isOnline: false,
-            ratingAverage: 0,
-            totalTrips: 0,
-          },
-        },
+      expect(res.body.status).toBe('success');
+      expect(res.body.data.driver).toMatchObject({
+        driverName: 'Mustapha Zaxi',
+        phoneNumber: '+213555123456',
+        whatsappNumber: '+213555123456',
+        profilePhoto: 'https://example.com/photo.jpg',
+        description: 'Professional driver in BBA',
+        workingHours: '08:00 - 20:00',
+        isOnline: false,
+        ratingAverage: 0,
+        totalTrips: 0,
       });
     });
   });

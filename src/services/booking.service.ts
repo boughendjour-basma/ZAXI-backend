@@ -16,6 +16,9 @@ export interface CreateBookingInput {
     longitude: number;
   };
   scheduledAt?: string;
+  offerPrice?: number;
+  notes?: string;
+  announcementId?: string;
 }
 
 export class BookingService {
@@ -58,12 +61,19 @@ export class BookingService {
       destinationCoords
     );
 
-    // 2. Calculate the price and pricing mode via PricingService
-    const { pricingType, estimatedPrice, cityFlatFareUsed, outsideRatePerKmUsed } = await PricingService.calculatePrice(
+    // 2. Calculate the price and pricing mode via PricingService (with BBA fixed routes)
+    let { pricingType, estimatedPrice, cityFlatFareUsed, outsideRatePerKmUsed } = await PricingService.calculatePrice(
       pickupCoords,
       destinationCoords,
-      distanceKm
+      distanceKm,
+      data.pickup.address,
+      data.destination.address
     );
+
+    // If an offerPrice was specified from a driver promotion / offer:
+    if (data.offerPrice && data.offerPrice > 0) {
+      estimatedPrice = data.offerPrice;
+    }
 
     // 3. Create the database record with pricing audit snapshot
     const booking = await prisma.booking.create({
@@ -76,7 +86,7 @@ export class BookingService {
         pickupAddress: data.pickup.address,
         pickupLatitude: data.pickup.latitude,
         pickupLongitude: data.pickup.longitude,
-        destinationAddress: data.destination.address,
+        destinationAddress: data.notes ? `${data.destination.address} (${data.notes})` : data.destination.address,
         destinationLatitude: data.destination.latitude,
         destinationLongitude: data.destination.longitude,
         distanceKm,

@@ -9,7 +9,12 @@ export class BookingController {
       const validatedData = estimateSchema.parse(req.body);
       const { pickup, destination } = validatedData;
       
-      const estimate = await EstimateService.calculateEstimate(pickup, destination);
+      const estimate = await EstimateService.calculateEstimate(
+        pickup,
+        destination,
+        pickup.address,
+        destination.address
+      );
       
       res.status(200).json(estimate);
     } catch (error) {

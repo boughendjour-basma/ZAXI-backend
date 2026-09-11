@@ -31,7 +31,10 @@ describe('Step 13 — Driver Management & Platform Administration', () => {
       prismaMock.booking.count.mockResolvedValue(50);
       prismaMock.rating.findMany.mockResolvedValue([{ score: 5 }] as any);
       prismaMock.payment.aggregate.mockResolvedValue({ _sum: { amount: 10000 } } as any);
-      prismaMock.booking.aggregate.mockResolvedValue({ _avg: { distanceKm: 15.5 } } as any);
+      prismaMock.booking.aggregate.mockResolvedValue({
+        _avg: { distanceKm: 15.5 },
+        _sum: { estimatedPrice: 10000 },
+      } as any);
 
       const res = await request(app)
         .get('/api/driver/statistics')

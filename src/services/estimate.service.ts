@@ -19,15 +19,22 @@ export class EstimateService {
    * @param destination Ending coordinates
    * @returns EstimateResult containing pricingType, distance, duration, rate, and estimated price
    */
-  static async calculateEstimate(pickup: Coordinates, destination: Coordinates): Promise<EstimateResult> {
+  static async calculateEstimate(
+    pickup: Coordinates,
+    destination: Coordinates,
+    pickupAddress?: string | null,
+    destinationAddress?: string | null
+  ): Promise<EstimateResult> {
     // 1. Get route distance and duration from MapsService
     const { distanceKm, durationMinutes } = await MapsService.getRoute(pickup, destination);
 
-    // 2. Calculate price using PricingService & ZoneService
+    // 2. Calculate price using PricingService, ZoneService & BBA Fixed Routes
     const { pricingType, ratePerKm, estimatedPrice } = await PricingService.calculatePrice(
       pickup,
       destination,
-      distanceKm
+      distanceKm,
+      pickupAddress,
+      destinationAddress
     );
 
     return {

@@ -26,8 +26,18 @@ export class DriverManagementService {
    */
   static async getStatistics() {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Use UTC boundaries adjusted for Algeria (UTC+1) so "today" and "this month"
+    // match the driver's local clock rather than the server's UTC clock.
+    const ALGERIA_OFFSET_MS = 1 * 60 * 60 * 1000; // UTC+1
+    const localNow = new Date(now.getTime() + ALGERIA_OFFSET_MS);
+    const localYear = localNow.getUTCFullYear();
+    const localMonth = localNow.getUTCMonth();
+    const localDate = localNow.getUTCDate();
+
+    // startOfDay / startOfMonth expressed in UTC so Prisma comparisons are correct
+    const startOfDay = new Date(Date.UTC(localYear, localMonth, localDate) - ALGERIA_OFFSET_MS);
+    const startOfMonth = new Date(Date.UTC(localYear, localMonth, 1) - ALGERIA_OFFSET_MS);
 
     const [
       totalCustomers,
@@ -36,43 +46,59 @@ export class DriverManagementService {
       totalBookings,
       completedRides,
       cancelledRides,
+      todayCompletedRides,
       ratings,
-      paymentsSummary,
-      dailyPaymentsSummary,
-      monthlyPaymentsSummary,
       completedBookingsDistance,
+      allTimeRevenueSummary,
+      todayRevenueSummary,
+      monthlyRevenueSummary,
     ] = await Promise.all([
       // Customers
       prisma.user.count({ where: { role: Role.CUSTOMER } }),
       prisma.user.count({ where: { role: Role.CUSTOMER, isActive: true } }),
       prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
 
-      // Bookings
+      // Bookings totals
       prisma.booking.count(),
       prisma.booking.count({ where: { status: BookingStatus.COMPLETED } }),
       prisma.booking.count({ where: { status: BookingStatus.CANCELLED } }),
 
+      // Today's completed rides count
+      prisma.booking.count({
+        where: { status: BookingStatus.COMPLETED, updatedAt: { gte: startOfDay } },
+      }),
+
       // Ratings
       prisma.rating.findMany({ select: { score: true } }),
-
-      // Financials
-      prisma.payment.aggregate({
-        where: { status: PaymentStatus.PAID },
-        _sum: { amount: true },
-      }),
-      prisma.payment.aggregate({
-        where: { status: PaymentStatus.PAID, paidAt: { gte: startOfDay } },
-        _sum: { amount: true },
-      }),
-      prisma.payment.aggregate({
-        where: { status: PaymentStatus.PAID, paidAt: { gte: startOfMonth } },
-        _sum: { amount: true },
-      }),
 
       // Average distance
       prisma.booking.aggregate({
         where: { status: BookingStatus.COMPLETED },
         _avg: { distanceKm: true },
+      }),
+
+      // All-time cash revenue from completed rides
+      prisma.booking.aggregate({
+        where: { status: BookingStatus.COMPLETED },
+        _sum: { estimatedPrice: true },
+      }),
+
+      // Today's cash revenue from completed rides
+      prisma.booking.aggregate({
+        where: {
+          status: BookingStatus.COMPLETED,
+          updatedAt: { gte: startOfDay },
+        },
+        _sum: { estimatedPrice: true },
+      }),
+
+      // This month's cash revenue from completed rides
+      prisma.booking.aggregate({
+        where: {
+          status: BookingStatus.COMPLETED,
+          updatedAt: { gte: startOfMonth },
+        },
+        _sum: { estimatedPrice: true },
       }),
     ]);
 
@@ -80,9 +106,10 @@ export class DriverManagementService {
     const totalScore = ratings.reduce((sum, r) => sum + r.score, 0);
     const averageRating = totalRatings > 0 ? Math.round((totalScore / totalRatings) * 10) / 10 : 0;
 
-    const totalRevenue = paymentsSummary?._sum?.amount ?? 0;
-    const dailyRevenue = dailyPaymentsSummary?._sum?.amount ?? 0;
-    const monthlyRevenue = monthlyPaymentsSummary?._sum?.amount ?? 0;
+    const totalRevenue = allTimeRevenueSummary?._sum?.estimatedPrice ?? 0;
+    const dailyRevenue = todayRevenueSummary?._sum?.estimatedPrice ?? 0;
+    const monthlyRevenue = monthlyRevenueSummary?._sum?.estimatedPrice ?? 0;
+
     const avgKm = completedBookingsDistance?._avg?.distanceKm;
     const averageDistanceKm = typeof avgKm === 'number' ? Math.round(avgKm * 10) / 10 : 0;
 
@@ -93,6 +120,7 @@ export class DriverManagementService {
       totalRides: totalBookings,
       completedRides,
       cancelledRides,
+      todayCompletedRides,
       averageDistanceKm,
       totalRevenue,
       dailyRevenue,

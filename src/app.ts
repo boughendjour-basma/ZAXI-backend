@@ -32,8 +32,20 @@ app.use(cors({
     if (!origin || process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
-    const allowed = process.env.CLIENT_URL;
-    if (allowed && (allowed === '*' || origin === allowed)) {
+    const clientUrl = process.env.CLIENT_URL?.trim();
+    const corsOrigins = process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+      : [];
+    const allowedList = [clientUrl, ...corsOrigins].filter(Boolean) as string[];
+
+    // Normalize origins by removing trailing slashes for comparison
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    const isAllowed = allowedList.some((allowed) => {
+      if (allowed === '*') return true;
+      return allowed.replace(/\/+$/, '') === normalizedOrigin;
+    });
+
+    if (isAllowed || allowedList.length === 0) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
@@ -52,9 +64,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Parse JSON and URL-encoded bodies with strict limits (1MB) to protect against payload inflation DoS
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// Parse JSON and URL-encoded bodies (up to 15MB for vehicle photos and documents)
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // Basic health check route
 app.get('/health', (_req: Request, res: Response) => {

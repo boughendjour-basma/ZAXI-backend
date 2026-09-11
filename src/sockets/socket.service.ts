@@ -14,13 +14,32 @@ class SocketServiceClass {
 
   /**
    * Initialize the Socket.IO server, attached to the HTTP server.
-   * Must be called once at application startup (server.ts).
    */
   initialize(httpServer: HttpServer): SocketIOServer {
+    const clientUrl = process.env.CLIENT_URL?.trim();
+    const corsOrigins = process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+      : [];
+    const allowedOrigins = [clientUrl, ...corsOrigins].filter(Boolean) as string[];
+
     this.io = new SocketIOServer(httpServer, {
       cors: {
-        origin: '*',
+        origin: (origin, callback) => {
+          if (!origin || process.env.NODE_ENV !== 'production') {
+            return callback(null, true);
+          }
+          const normalizedOrigin = origin.replace(/\/+$/, '');
+          const isAllowed = allowedOrigins.some((allowed) => {
+            if (allowed === '*') return true;
+            return allowed.replace(/\/+$/, '') === normalizedOrigin;
+          });
+          if (isAllowed || allowedOrigins.length === 0) {
+            return callback(null, true);
+          }
+          return callback(new Error('Not allowed by CORS'));
+        },
         methods: ['GET', 'POST'],
+        credentials: true,
       },
     });
 
@@ -198,6 +217,11 @@ class SocketServiceClass {
   emitDriverPhoneAvailable(payload: { bookingId: string; phone: string }): void {
     this.io?.to(`booking:${payload.bookingId}`).emit('driver:phone_available', payload);
     this.io?.emit('driver:phone_available', payload);
+  }
+
+  /** Emit pricing:updated event to all connected clients. */
+  emitPricingUpdated(payload: { cityFlatFare: number; outsideRatePerKm: number }): void {
+    this.io?.emit('pricing:updated', payload);
   }
 }
 

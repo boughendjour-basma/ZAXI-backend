@@ -79,9 +79,14 @@ describe('Booking Creation API Endpoint', () => {
     // Assert Maps and Pricing were called correctly
     const pickupCoords = { latitude: validPickup.latitude, longitude: validPickup.longitude };
     const destCoords = { latitude: validDestination.latitude, longitude: validDestination.longitude };
-
     expect(MapsService.getRoute).toHaveBeenCalledWith(pickupCoords, destCoords);
-    expect(PricingService.calculatePrice).toHaveBeenCalledWith(pickupCoords, destCoords, 5.5);
+    expect(PricingService.calculatePrice).toHaveBeenCalledWith(
+      pickupCoords,
+      destCoords,
+      5.5,
+      validPickup.address,
+      validDestination.address
+    );
 
     // Assert Prisma was called with correct data including pricingType
     expect(prismaMock.booking.create).toHaveBeenCalledWith({

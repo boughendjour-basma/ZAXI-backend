@@ -8,6 +8,7 @@ describe('PricingService - Dynamic Pricing Engine', () => {
   const bbaDowntown = { latitude: 36.0686, longitude: 4.7622 };
   const elAchir = { latitude: 36.0638, longitude: 4.6275 };
   const medjana = { latitude: 36.1350, longitude: 4.6650 };
+  const outsideCity = { latitude: 36.1900, longitude: 5.4100 }; // Sétif / non-daïra outside trip
 
   beforeEach(() => {
     // Default Prisma mock return value for PricingSettings
@@ -31,7 +32,7 @@ describe('PricingService - Dynamic Pricing Engine', () => {
     });
 
     it('should apply DISTANCE fare when pickup is inside but destination is outside city limits', async () => {
-      const result = await PricingService.calculatePrice(bbaCenter, elAchir, 10.0);
+      const result = await PricingService.calculatePrice(bbaCenter, outsideCity, 10.0);
       expect(result.pricingType).toBe(PricingType.DISTANCE);
       expect(result.ratePerKm).toBe(40);
       expect(result.estimatedPrice).toBe(400); // 10 * 40
@@ -39,7 +40,7 @@ describe('PricingService - Dynamic Pricing Engine', () => {
     });
 
     it('should apply DISTANCE fare when pickup is outside but destination is inside city limits', async () => {
-      const result = await PricingService.calculatePrice(medjana, bbaDowntown, 12.0);
+      const result = await PricingService.calculatePrice(outsideCity, bbaDowntown, 12.0);
       expect(result.pricingType).toBe(PricingType.DISTANCE);
       expect(result.ratePerKm).toBe(40);
       expect(result.estimatedPrice).toBe(480); // 12 * 40
@@ -97,10 +98,30 @@ describe('PricingService - Dynamic Pricing Engine', () => {
         updatedAt: new Date(),
       });
 
-      const result = await PricingService.calculatePrice(bbaCenter, elAchir, 10.0);
+      const result = await PricingService.calculatePrice(bbaCenter, outsideCity, 10.0);
       expect(result.pricingType).toBe(PricingType.DISTANCE);
       expect(result.ratePerKm).toBe(50);
       expect(result.estimatedPrice).toBe(500); // 10 * 50
+    });
+  });
+
+  // ── BBA Fixed Routes (Official Tariffs) ───────────────────────────────
+
+  describe('BBA Daïras Fixed Routes (Official Tariffs)', () => {
+    it('should apply 800 DA fixed fare for trips between BBA Center and El Achir', async () => {
+      const result = await PricingService.calculatePrice(bbaCenter, elAchir, 12.0);
+      expect(result.pricingType).toBe(PricingType.CITY);
+      expect(result.estimatedPrice).toBe(800);
+      expect(result.ratePerKm).toBeNull();
+      expect(result.fixedRouteName).toBe('الياشير');
+    });
+
+    it('should apply 500 DA fixed fare for return trips from Medjana to BBA Center', async () => {
+      const result = await PricingService.calculatePrice(medjana, bbaCenter, 11.0);
+      expect(result.pricingType).toBe(PricingType.CITY);
+      expect(result.estimatedPrice).toBe(500);
+      expect(result.ratePerKm).toBeNull();
+      expect(result.fixedRouteName).toBe('مجانة');
     });
   });
 
