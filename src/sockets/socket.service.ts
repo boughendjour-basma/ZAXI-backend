@@ -28,11 +28,13 @@ class SocketServiceClass {
           if (!origin || process.env.NODE_ENV !== 'production') {
             return callback(null, true);
           }
-          const normalizedOrigin = origin.replace(/\/+$/, '');
-          const isAllowed = allowedOrigins.some((allowed) => {
-            if (allowed === '*') return true;
-            return allowed.replace(/\/+$/, '') === normalizedOrigin;
-          });
+          const isAllowed =
+            origin.startsWith('http://localhost:') ||
+            origin.startsWith('http://127.0.0.1:') ||
+            allowedOrigins.some((allowed) => {
+              if (allowed === '*') return true;
+              return allowed.replace(/\/+$/, '') === normalizedOrigin;
+            });
           if (isAllowed || allowedOrigins.length === 0) {
             return callback(null, true);
           }

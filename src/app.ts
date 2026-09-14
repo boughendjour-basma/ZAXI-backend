@@ -39,11 +39,13 @@ app.use(cors({
     const allowedList = [clientUrl, ...corsOrigins].filter(Boolean) as string[];
 
     // Normalize origins by removing trailing slashes for comparison
-    const normalizedOrigin = origin.replace(/\/+$/, '');
-    const isAllowed = allowedList.some((allowed) => {
-      if (allowed === '*') return true;
-      return allowed.replace(/\/+$/, '') === normalizedOrigin;
-    });
+    const isAllowed =
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      allowedList.some((allowed) => {
+        if (allowed === '*') return true;
+        return allowed.replace(/\/+$/, '') === normalizedOrigin;
+      });
 
     if (isAllowed || allowedList.length === 0) {
       return callback(null, true);
