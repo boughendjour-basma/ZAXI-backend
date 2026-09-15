@@ -30,14 +30,10 @@ export class MapsService {
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
-    if (!apiKey) {
-      const error: any = new Error('Google Maps API key is not configured');
-      error.statusCode = 503;
-      throw error;
-    }
+    // When GOOGLE_MAPS_API_KEY is missing, placeholder or mock-key -> use free OSRM / Haversine fallback
+    const useFallback = !apiKey || apiKey.includes('your-google-routes-api-key') || apiKey === 'mock-key';
 
-    // When GOOGLE_MAPS_API_KEY is placeholder or mock-key -> use free OSRM / Haversine fallback
-    if (apiKey.includes('your-google-routes-api-key') || apiKey === 'mock-key') {
+    if (useFallback) {
       try {
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickup.longitude},${pickup.latitude};${destination.longitude},${destination.latitude}?overview=false`;
         const res = await fetch(osrmUrl, {
