@@ -43,6 +43,9 @@ app.use(cors({
     const isAllowed =
       origin.startsWith('http://localhost:') ||
       origin.startsWith('http://127.0.0.1:') ||
+      origin.endsWith('.web.app') ||
+      origin.endsWith('.firebaseapp.com') ||
+      origin.includes('zaxi') ||
       allowedList.some((allowed) => {
         if (allowed === '*') return true;
         return allowed.replace(/\/+$/, '') === normalizedOrigin;
