@@ -28,6 +28,7 @@ class SocketServiceClass {
           if (!origin || process.env.NODE_ENV !== 'production') {
             return callback(null, true);
           }
+          const normalizedOrigin = origin.replace(/\/+$/, '');
           const isAllowed =
             origin.startsWith('http://localhost:') ||
             origin.startsWith('http://127.0.0.1:') ||
