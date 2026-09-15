@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import process from 'node:process';
 import { MapsService } from '../src/services/maps.service';
 
 const originalFetch = globalThis.fetch;
@@ -97,7 +96,6 @@ describe('MapsService (OSRM + Haversine fallback)', () => {
   });
 
   it('6. Does not require any GOOGLE_MAPS_API_KEY', async () => {
-    delete process.env.GOOGLE_MAPS_API_KEY;
     const mockResponse = {
       code: 'Ok',
       routes: [{ distance: 3000, duration: 360 }],
