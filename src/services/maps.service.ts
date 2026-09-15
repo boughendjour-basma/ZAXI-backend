@@ -30,7 +30,8 @@ export class MapsService {
 
     // Try OSRM first (free open-source routing)
     try {
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickup.longitude},${pickup.latitude};${destination.longitude},${destination.latitude}?overview=false`;
+      const baseUrl = (process.env.OSRM_ROUTING_URL || 'https://router.project-osrm.org').replace(/\/+$/, '');
+      const osrmUrl = `${baseUrl}/route/v1/driving/${pickup.longitude},${pickup.latitude};${destination.longitude},${destination.latitude}?overview=false`;
       const res = await fetch(osrmUrl, {
         headers: { 'User-Agent': 'ZaxiAlgeria/1.0 (RideApp)' },
         signal: AbortSignal.timeout(5000),

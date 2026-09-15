@@ -24,7 +24,8 @@ export const envSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_PHONE_NUMBER: z.string().optional(),
 
-  GOOGLE_MAPS_API_KEY: z.string().optional().default('mock-key'),
+  OSRM_ROUTING_URL: z.string().url().default('https://router.project-osrm.org'),
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
 
   CORS_ORIGINS: z.string().default('*'),
 });
