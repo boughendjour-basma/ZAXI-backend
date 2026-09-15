@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import process from 'node:process';
 import { MapsService } from '../src/services/maps.service';
 
 const originalFetch = globalThis.fetch;
