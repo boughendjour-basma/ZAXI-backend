@@ -31,9 +31,12 @@ export const createBookingSchema = z.object({
     if (!val) return true;
     return new Date(val).getTime() >= Date.now();
   }, { message: 'scheduledAt must not be in the past' }),
-  offerPrice: z.number().int().positive().optional(),
+  offerPrice: z.preprocess((val) => {
+    if (val === 0 || val === '0' || val === null || val === '') return undefined;
+    return val;
+  }, z.number().int().positive().optional()),
   notes: z.string().max(1000).optional(),
-  announcementId: z.string().uuid().optional(),
+  announcementId: z.string().optional(),
 }).strict();
 
 export const paginationQuerySchema = z.object({
