@@ -24,7 +24,11 @@ router.post('/reverse-geocode', async (req, res) => {
       return;
     }
     const nomRes = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fr`
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fr`,
+      {
+        headers: { 'User-Agent': 'ZAXI-Taxi-App/1.0 (contact@zaxi.dz)' },
+        signal: AbortSignal.timeout(5000),
+      }
     );
     const nomData = await nomRes.json();
     const address = nomData.display_name

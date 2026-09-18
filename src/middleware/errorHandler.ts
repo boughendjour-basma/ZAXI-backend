@@ -13,6 +13,21 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
     });
   }
 
+  // Handle Prisma Foreign Key & Not Found errors
+  if (err?.code === 'P2003') {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Compte client introuvable ou session expirée. Veuillez vous reconnecter.',
+    });
+  }
+
+  if (err?.code === 'P2025') {
+    return res.status(404).json({
+      status: 'error',
+      message: 'Enregistrement introuvable.',
+    });
+  }
+
   // Define structured error response
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
