@@ -30,7 +30,11 @@ export class BookingController {
 
       const validatedData = createBookingSchema.parse(req.body);
       
-      const booking = await BookingService.createBooking(req.user.userId, validatedData);
+      const userMeta = {
+        name: (req.user as any)?.name,
+        phone: (req.user as any)?.phone,
+      };
+      const booking = await BookingService.createBooking(req.user.userId, validatedData, userMeta);
       
       return res.status(201).json({
         status: 'success',

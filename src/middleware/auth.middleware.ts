@@ -25,7 +25,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     if (process.env.NODE_ENV !== 'test') {
       const user = await prisma.user.findUnique({
         where: { id: payload.userId },
-        select: { id: true, role: true, isActive: true },
+        select: { id: true, role: true, isActive: true, name: true, phone: true },
       });
 
       if (!user) {
@@ -43,6 +43,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       }
 
       req.user.role = user.role;
+      (req.user as any).name = user.name;
+      (req.user as any).phone = user.phone;
     }
 
     next();

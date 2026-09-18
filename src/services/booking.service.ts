@@ -29,7 +29,11 @@ export class BookingService {
    * @param data Validated booking input data
    * @returns The created booking record
    */
-  static async createBooking(customerId: string, data: CreateBookingInput) {
+  static async createBooking(
+    customerId: string,
+    data: CreateBookingInput,
+    customerMeta?: { name?: string | null; phone?: string | null }
+  ) {
     // 0. Ensure customer has no active booking in progress
     const activeBooking = await prisma.booking.findFirst({
       where: {
@@ -96,18 +100,25 @@ export class BookingService {
       },
     });
 
-    // Query customer info to attach to live socket broadcast
+    // Customer info attached to live socket broadcast (instant from customerMeta, or query DB)
     let customerInfo: { name: string | null; phone: string } | null = null;
-    try {
-      const customer = await prisma.user.findUnique({
-        where: { id: customerId },
-        select: { name: true, phone: true },
-      });
-      if (customer) {
-        customerInfo = { name: customer.name, phone: customer.phone };
+    if (customerMeta?.phone) {
+      customerInfo = {
+        name: customerMeta.name || null,
+        phone: customerMeta.phone,
+      };
+    } else {
+      try {
+        const customer = await prisma.user.findUnique({
+          where: { id: customerId },
+          select: { name: true, phone: true },
+        });
+        if (customer) {
+          customerInfo = { name: customer.name, phone: customer.phone };
+        }
+      } catch {
+        // Non-blocking
       }
-    } catch {
-      // Non-blocking
     }
 
     const formattedBooking = {
