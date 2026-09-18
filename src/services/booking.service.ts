@@ -96,6 +96,20 @@ export class BookingService {
       },
     });
 
+    // Query customer info to attach to live socket broadcast
+    let customerInfo: { name: string | null; phone: string } | null = null;
+    try {
+      const customer = await prisma.user.findUnique({
+        where: { id: customerId },
+        select: { name: true, phone: true },
+      });
+      if (customer) {
+        customerInfo = { name: customer.name, phone: customer.phone };
+      }
+    } catch {
+      // Non-blocking
+    }
+
     const formattedBooking = {
       ...booking,
       bookingId: booking.id,
@@ -104,6 +118,7 @@ export class BookingService {
       dropoffLat: booking.destinationLatitude,
       dropoffLng: booking.destinationLongitude,
       dropoffAddress: booking.destinationAddress,
+      customer: customerInfo,
     };
 
     // Emit real-time notification to drivers
